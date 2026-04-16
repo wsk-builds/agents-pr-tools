@@ -1,0 +1,18 @@
+{
+  "name": "agents-pr-tools",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Small GitHub PR reporting utilities for upstream contributors and maintainers.",
+  "bin": {
+    "agents-pr-tools": "./src/cli.mjs"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
