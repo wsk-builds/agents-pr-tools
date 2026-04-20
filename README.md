@@ -9,11 +9,13 @@ When you contribute to an upstream repository through a working fork, you often 
 This project provides a zero-dependency Node.js CLI that:
 
 - fetches PRs for one or more authors in a given repository
+- resolves the authenticated GitHub viewer with `--author @me`
 - paginates and sorts results for stable reporting
 - distinguishes merged PRs from closed-but-unmerged PRs
 - filters reports to a date window and one or more inferred work areas
 - groups work by rough area inferred from the PR title
 - renders output as Markdown, a plain-text table, raw JSON, CSV, or release-notes Markdown
+- writes reports directly to disk when you pass `--output`
 - supports compact summary-only reports
 
 ## Use cases
@@ -27,6 +29,12 @@ This project provides a zero-dependency Node.js CLI that:
 
 ```bash
 node src/cli.mjs --repo openai/openai-agents-js --author wsk-builds --state merged --limit 20 --format markdown
+```
+
+Using your current authenticated GitHub account:
+
+```bash
+node src/cli.mjs --repo openai/openai-agents-js --author @me --state merged --summary-only
 ```
 
 Recent merged work only:
@@ -54,6 +62,17 @@ node src/cli.mjs \
 ```
 
 The CLI will use `GITHUB_TOKEN` or `GH_TOKEN` when present. If neither is set, it will try `gh auth token`.
+
+Write a report directly to a file:
+
+```bash
+node src/cli.mjs \
+  --repo openai/openai-agents-js \
+  --author @me \
+  --state merged \
+  --summary-only \
+  --output reports/openai-agents-js-summary.md
+```
 
 ## Example output
 
@@ -84,6 +103,7 @@ The CLI will use `GITHUB_TOKEN` or `GH_TOKEN` when present. If neither is set, i
 - `--since <date>`: start date in ISO-8601 format
 - `--until <date>`: end date in ISO-8601 format
 - `--area <name[,name...]>`: filter by inferred area
+- `--output <path>`: write the rendered report to a file (`-` keeps stdout)
 - `--summary-only`: render only the summary sections
 - `--help`: show usage
 
@@ -99,12 +119,14 @@ Known inferred areas:
 
 ## Reporting behavior
 
+- `@me` resolves the currently authenticated GitHub user and requires `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth login`.
 - `merged` reports use the PR merged timestamp for `--since` and `--until`.
 - `closed` means closed but not merged.
 - `open` and `all` date filters use the PR created timestamp.
 - Full JSON output remains a raw PR list. Summary-only JSON emits a compact summary object instead.
 - `csv` exports full row data for spreadsheet workflows.
 - `release-notes` emits grouped Markdown suitable for changelogs or application materials.
+- `--output` creates parent directories automatically before writing the report file.
 
 ## Development
 

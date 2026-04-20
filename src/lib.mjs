@@ -79,6 +79,41 @@ export function parseAuthorLogins(value) {
   return splitCommaSeparated(value, 'author').map((author) => author.toLowerCase());
 }
 
+export async function fetchViewerLogin({ fetchImpl, token }) {
+  if (!token) {
+    throw new Error(
+      '--author @me requires GitHub authentication via GITHUB_TOKEN, GH_TOKEN, or gh auth login.'
+    );
+  }
+
+  const payload = await readJson(
+    await fetchImpl(new URL('https://api.github.com/user'), {
+      headers: buildHeaders(token)
+    })
+  );
+
+  const login = String(payload.login || '')
+    .trim()
+    .toLowerCase();
+
+  if (!login) {
+    throw new Error('Unable to resolve the authenticated GitHub login for --author @me.');
+  }
+
+  return login;
+}
+
+export async function resolveAuthorLogins({ authors, fetchImpl, token }) {
+  const normalizedAuthors = Array.isArray(authors) ? authors : parseAuthorLogins(authors);
+
+  if (!normalizedAuthors.includes('@me')) {
+    return normalizedAuthors;
+  }
+
+  const viewerLogin = await fetchViewerLogin({ fetchImpl, token });
+  return [...new Set(normalizedAuthors.map((author) => (author === '@me' ? viewerLogin : author)))];
+}
+
 export function parseAreaFilter(value) {
   if (value === undefined || value === null || String(value).trim() === '') {
     return [];

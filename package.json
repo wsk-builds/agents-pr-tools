@@ -4,6 +4,26 @@
   "private": false,
   "type": "module",
   "description": "Small GitHub PR reporting utilities for upstream contributors and maintainers.",
+  "keywords": [
+    "github",
+    "pull-requests",
+    "cli",
+    "reporting",
+    "release-notes"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wsk-builds/agents-pr-tools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wsk-builds/agents-pr-tools/issues"
+  },
+  "homepage": "https://github.com/wsk-builds/agents-pr-tools#readme",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
     "agents-pr-tools": "./src/cli.mjs"
   },

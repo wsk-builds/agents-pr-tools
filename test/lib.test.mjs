@@ -7,6 +7,7 @@ import {
   canonicalizeState,
   fetchPullRequests,
   fetchPullRequestsForAuthors,
+  fetchViewerLogin,
   filterPullRequestsByArea,
   filterPullRequestsByDateRange,
   getKnownAreas,
@@ -18,6 +19,7 @@ import {
   normalizeState,
   parseAreaFilter,
   parseAuthorLogins,
+  resolveAuthorLogins,
   summarizeAuthors,
   summarizePullRequests,
   summarizeStates,
@@ -51,6 +53,35 @@ test('normalizers and parsers validate inputs and support multiple authors and a
   assert.throws(() => normalizeState('draft'), /Invalid state/);
   assert.throws(() => normalizeFormat('yaml'), /Invalid format/);
   assert.throws(() => parseAreaFilter('unknown'), /Invalid area/);
+});
+
+test('resolveAuthorLogins expands @me through the authenticated GitHub viewer', async () => {
+  const fetchImpl = async (url) => {
+    const requestUrl = new URL(url);
+    assert.equal(requestUrl.pathname, '/user');
+    return jsonResponse({ login: 'Wsk-Builds' });
+  };
+
+  assert.equal(await fetchViewerLogin({ fetchImpl, token: 'fake-token' }), 'wsk-builds');
+  assert.deepEqual(
+    await resolveAuthorLogins({
+      authors: ['@me', 'alice', '@me'],
+      fetchImpl,
+      token: 'fake-token'
+    }),
+    ['wsk-builds', 'alice']
+  );
+});
+
+test('resolveAuthorLogins rejects @me without authentication', async () => {
+  await assert.rejects(
+    () =>
+      resolveAuthorLogins({
+        authors: ['@me'],
+        fetchImpl: async () => jsonResponse({ login: 'alice' })
+      }),
+    /--author @me requires GitHub authentication/
+  );
 });
 
 test('inferArea, canonicalizeState, and summaries stay meaningful across multiple authors', () => {
