@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   buildSummaryPayload,
@@ -13,8 +15,8 @@ import {
   normalizeSort,
   normalizeState,
   parseAreaFilter,
-  parseAuthorLogins,
   parseRepo,
+  resolveAuthorLogins,
   toCsv,
   toMarkdown,
   toReleaseNotes,
@@ -28,7 +30,7 @@ export function usage() {
     '',
     'Options:',
     '  --repo <owner/name>                     Target repository.',
-    '  --author <login[,login...]>            One or more GitHub author logins.',
+    '  --author <login[,login...]>            One or more GitHub author logins. Use @me for the authenticated viewer.',
     '  --state <merged|open|closed|all>       Pull request state filter. Default: merged.',
     '  --limit <n>                            Maximum number of PRs to fetch. Default: 20.',
     '  --format <markdown|table|json|csv|release-notes>',
@@ -38,6 +40,7 @@ export function usage() {
     '  --since <date>                         Start date filter in ISO-8601 format.',
     '  --until <date>                         End date filter in ISO-8601 format.',
     `  --area <name[,name...]>                Filter by inferred area. Known areas: ${getKnownAreas().join(', ')}.`,
+    '  --output <path>                        Write the report to a file. Use - for stdout.',
     '  --summary-only                         Omit the full PR list and render only summaries.',
     '  --help                                 Show this help text.',
     '',
@@ -45,7 +48,8 @@ export function usage() {
     '  - merged reports filter by merged date when --since/--until is used.',
     '  - closed reports mean closed but not merged.',
     '  - open and all reports filter by created date.',
-    '  - csv and release-notes always render full output.'
+    '  - csv and release-notes always render full output.',
+    '  - @me requires GitHub authentication.'
   ].join('\n');
 }
 
@@ -110,6 +114,8 @@ export function parseArgs(argv) {
       options.until = value;
     } else if (arg === '--area') {
       options.area = value;
+    } else if (arg === '--output') {
+      options.output = value;
     } else {
       throw new Error(`Unknown option "${arg}".`);
     }
@@ -131,7 +137,6 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
   }
 
   const repo = parseRepo(options.repo).fullName;
-  const authors = parseAuthorLogins(options.author);
   const areas = parseAreaFilter(options.area);
   const state = normalizeState(options.state);
   const format = normalizeFormat(options.format);
@@ -150,6 +155,11 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
   const fetchImpl = dependencies.fetchImpl || fetch;
   const stdout = dependencies.stdout || process.stdout;
   const token = await getAccessToken({ execFileSync: execFileSyncImpl });
+  const authors = await resolveAuthorLogins({
+    authors: options.author,
+    fetchImpl,
+    token
+  });
   const pullRequests = await fetchPullRequestsForAuthors({
     repo,
     authors,
@@ -177,28 +187,28 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
     summaryOnly: options.summaryOnly
   };
 
+  let renderedOutput;
+
   if (format === 'json') {
     const jsonPayload = options.summaryOnly ? buildSummaryPayload(payload) : pullRequests;
-    stdout.write(`${JSON.stringify(jsonPayload, null, 2)}\n`);
+    renderedOutput = `${JSON.stringify(jsonPayload, null, 2)}\n`;
+  } else if (format === 'table') {
+    renderedOutput = toTable(payload);
+  } else if (format === 'csv') {
+    renderedOutput = toCsv(payload);
+  } else if (format === 'release-notes') {
+    renderedOutput = toReleaseNotes(payload);
+  } else {
+    renderedOutput = toMarkdown(payload);
+  }
+
+  if (!options.output || options.output === '-') {
+    stdout.write(renderedOutput);
     return;
   }
 
-  if (format === 'table') {
-    stdout.write(toTable(payload));
-    return;
-  }
-
-  if (format === 'csv') {
-    stdout.write(toCsv(payload));
-    return;
-  }
-
-  if (format === 'release-notes') {
-    stdout.write(toReleaseNotes(payload));
-    return;
-  }
-
-  stdout.write(toMarkdown(payload));
+  mkdirSync(dirname(options.output), { recursive: true });
+  writeFileSync(options.output, renderedOutput, 'utf8');
 }
 
 const entryUrl = process.argv[1] ? pathToFileURL(process.argv[1]).href : undefined;
