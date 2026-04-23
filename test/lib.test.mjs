@@ -10,6 +10,7 @@ import {
   fetchViewerLogin,
   filterPullRequestsByArea,
   filterPullRequestsByDateRange,
+  filterPullRequestsByLabels,
   getKnownAreas,
   inferArea,
   normalizeDateRange,
@@ -19,8 +20,10 @@ import {
   normalizeState,
   parseAreaFilter,
   parseAuthorLogins,
+  parseLabelFilter,
   resolveAuthorLogins,
   summarizeAuthors,
+  summarizeLabels,
   summarizePullRequests,
   summarizeStates,
   toCsv,
@@ -42,13 +45,14 @@ function jsonResponse(payload, status = 200) {
   };
 }
 
-test('normalizers and parsers validate inputs and support multiple authors and areas', () => {
+test('normalizers and parsers validate inputs and support multiple authors, areas, and labels', () => {
   assert.equal(normalizeState('merged'), 'merged');
   assert.equal(normalizeFormat('release-notes'), 'release-notes');
   assert.equal(normalizeSort('updated'), 'updated');
   assert.equal(normalizeOrder('asc'), 'asc');
   assert.deepEqual(parseAuthorLogins('Alice,bob'), ['alice', 'bob']);
   assert.deepEqual(parseAreaFilter('docs,tests'), ['docs', 'tests']);
+  assert.deepEqual(parseLabelFilter('Docs,Bug,docs'), ['docs', 'bug']);
   assert.ok(getKnownAreas().includes('docs'));
   assert.throws(() => normalizeState('draft'), /Invalid state/);
   assert.throws(() => normalizeFormat('yaml'), /Invalid format/);
@@ -88,9 +92,9 @@ test('inferArea, canonicalizeState, and summaries stay meaningful across multipl
   const pullRequests = [
     {
       number: 1,
-      title: 'fix(agents-realtime): fail fast on unsupported SIP VAD fields',
+      title: 'fix: fail fast on unsupported SIP VAD fields',
       author: 'alice',
-      area: 'agents-realtime',
+      labels: ['Realtime', 'Voice'],
       state: 'merged',
       mergedAt: '2026-04-01T00:00:00.000Z'
     },
@@ -99,12 +103,13 @@ test('inferArea, canonicalizeState, and summaries stay meaningful across multipl
       title: 'docs: fix tools example commands',
       author: 'bob',
       area: 'docs',
+      labels: ['docs'],
       state: 'closed',
       mergedAt: null
     }
   ];
 
-  assert.equal(inferArea(pullRequests[0].title), 'agents-realtime');
+  assert.equal(inferArea(pullRequests[0].title, pullRequests[0].labels), 'agents-realtime');
   assert.equal(canonicalizeState({ state: 'closed', mergedAt: '2026-04-01T00:00:00.000Z' }), 'merged');
   assert.equal(canonicalizeState({ state: 'closed', mergedAt: null }), 'closed');
   assert.deepEqual(summarizePullRequests(pullRequests), [
@@ -118,6 +123,11 @@ test('inferArea, canonicalizeState, and summaries stay meaningful across multipl
   assert.deepEqual(summarizeAuthors(pullRequests), [
     { author: 'alice', count: 1 },
     { author: 'bob', count: 1 }
+  ]);
+  assert.deepEqual(summarizeLabels(pullRequests), [
+    { label: 'docs', count: 1 },
+    { label: 'realtime', count: 1 },
+    { label: 'voice', count: 1 }
   ]);
 });
 
@@ -141,7 +151,7 @@ test('buildSearchQuery composes repo, author, and state filters', () => {
   );
 });
 
-test('date and area filtering use state-specific timestamps and inferred areas', () => {
+test('date, area, and label filtering use state-specific timestamps and inferred areas', () => {
   const dateRange = normalizeDateRange({
     since: '2026-04-01',
     until: '2026-04-30'
@@ -153,6 +163,7 @@ test('date and area filtering use state-specific timestamps and inferred areas',
       title: 'docs: clarify README',
       author: 'alice',
       area: 'docs',
+      labels: ['docs', 'bug'],
       state: 'merged',
       createdAt: '2026-03-20T00:00:00.000Z',
       closedAt: '2026-04-10T00:00:00.000Z',
@@ -163,6 +174,7 @@ test('date and area filtering use state-specific timestamps and inferred areas',
       title: 'fix(agents-core): another change',
       author: 'alice',
       area: 'agents-core',
+      labels: ['enhancement'],
       state: 'merged',
       createdAt: '2026-03-21T00:00:00.000Z',
       closedAt: '2026-05-02T00:00:00.000Z',
@@ -188,6 +200,10 @@ test('date and area filtering use state-specific timestamps and inferred areas',
     filterPullRequestsByArea(pullRequests, { areas: ['docs'] }).map((pr) => pr.number),
     [1]
   );
+  assert.deepEqual(
+    filterPullRequestsByLabels(pullRequests, { labels: ['BUG'] }).map((pr) => pr.number),
+    [1]
+  );
 });
 
 test('renderers cover markdown, table, csv, release-notes, and summary payloads', () => {
@@ -198,6 +214,7 @@ test('renderers cover markdown, table, csv, release-notes, and summary payloads'
       url: 'https://github.com/openai/openai-agents-js/pull/1171',
       author: 'alice',
       area: 'agents-extensions',
+      labels: ['bug', 'extensions'],
       state: 'merged',
       createdAt: '2026-04-10T12:00:00.000Z',
       updatedAt: '2026-04-10T13:00:00.000Z',
@@ -210,6 +227,7 @@ test('renderers cover markdown, table, csv, release-notes, and summary payloads'
       url: 'https://github.com/openai/openai-agents-js/pull/1158',
       author: 'bob',
       area: 'docs',
+      labels: ['docs'],
       state: 'closed',
       createdAt: '2026-04-08T12:00:00.000Z',
       updatedAt: '2026-04-08T13:00:00.000Z',
@@ -226,11 +244,14 @@ test('renderers cover markdown, table, csv, release-notes, and summary payloads'
     sort: 'created',
     order: 'desc',
     areas: ['docs', 'agents-extensions'],
+    labels: ['bug', 'docs'],
     summaryOnly: true
   });
 
   assert.match(markdown, /# Pull Request Summary for alice, bob/);
   assert.match(markdown, /## Author totals/);
+  assert.match(markdown, /## Labels/);
+  assert.match(markdown, /Label filter: bug, docs/);
   assert.doesNotMatch(markdown, /## Pull requests/);
 
   const table = toTable({
@@ -243,11 +264,14 @@ test('renderers cover markdown, table, csv, release-notes, and summary payloads'
   });
 
   assert.match(table, /Author totals/);
+  assert.match(table, /Label totals/);
+  assert.match(table, /Labels/);
   assert.match(table, /Number/);
   assert.match(table, /alice/);
 
   const csv = toCsv({ pullRequests });
-  assert.match(csv, /^number,author,area,state,/);
+  assert.match(csv, /^number,author,area,labels,state,/);
+  assert.match(csv, /bug, extensions/);
   assert.match(csv, /"docs: fix tools, example commands"/);
 
   const releaseNotes = toReleaseNotes({
@@ -272,7 +296,8 @@ test('renderers cover markdown, table, csv, release-notes, and summary payloads'
     until: '2026-04-30',
     sort: 'created',
     order: 'desc',
-    areas: ['docs']
+    areas: ['docs'],
+    labels: ['docs']
   }), {
     repo: 'openai/openai-agents-js',
     authors: ['alice', 'bob'],
@@ -292,12 +317,18 @@ test('renderers cover markdown, table, csv, release-notes, and summary payloads'
       { author: 'alice', count: 1 },
       { author: 'bob', count: 1 }
     ],
+    byLabel: [
+      { label: 'bug', count: 1 },
+      { label: 'docs', count: 1 },
+      { label: 'extensions', count: 1 }
+    ],
     dateRange: {
       field: 'created',
       since: '2026-04-01',
       until: '2026-04-30'
     },
-    areaFilter: ['docs']
+    areaFilter: ['docs'],
+    labelFilter: ['docs']
   });
 });
 
@@ -312,13 +343,16 @@ test('fetchPullRequests paginates and filters merged PRs out of the closed view'
 
       if (page === '1') {
         return jsonResponse({
-          items: [{ number: 11 }, { number: 10 }]
+          items: [
+            { number: 11, labels: [{ name: 'skip' }] },
+            { number: 10, labels: [{ name: 'docs' }] }
+          ]
         });
       }
 
       if (page === '2') {
         return jsonResponse({
-          items: [{ number: 9 }]
+          items: [{ number: 9, labels: [{ name: 'tests' }] }]
         });
       }
 
@@ -376,13 +410,20 @@ test('fetchPullRequests paginates and filters merged PRs out of the closed view'
     sort: 'created',
     order: 'desc',
     areas: ['docs'],
+    labels: ['docs'],
     fetchImpl
   });
 
   assert.deepEqual(
-    pullRequests.map((pr) => ({ number: pr.number, state: pr.state, author: pr.author, area: pr.area })),
+    pullRequests.map((pr) => ({
+      number: pr.number,
+      state: pr.state,
+      author: pr.author,
+      area: pr.area,
+      labels: pr.labels
+    })),
     [
-      { number: 10, state: 'closed', author: 'alice', area: 'docs' }
+      { number: 10, state: 'closed', author: 'alice', area: 'docs', labels: ['docs'] }
     ]
   );
 
@@ -390,6 +431,53 @@ test('fetchPullRequests paginates and filters merged PRs out of the closed view'
     calls.filter((call) => call.includes('/search/issues')).length,
     1
   );
+});
+
+test('fetchPullRequests retries public API reads without auth when the token is invalid', async () => {
+  const authHeaders = [];
+  const fetchImpl = async (url, { headers }) => {
+    const requestUrl = new URL(url);
+    authHeaders.push(headers.Authorization || null);
+
+    if (requestUrl.pathname === '/search/issues') {
+      if (headers.Authorization) {
+        return jsonResponse({ message: 'Bad credentials' }, 401);
+      }
+
+      return jsonResponse({
+        items: [{ number: 42, labels: [{ name: 'docs' }] }]
+      });
+    }
+
+    return jsonResponse({
+      number: 42,
+      title: 'docs: tighten README examples',
+      html_url: 'https://github.com/acme/demo/pull/42',
+      user: { login: 'alice' },
+      state: 'closed',
+      created_at: '2026-04-10T00:00:00.000Z',
+      updated_at: '2026-04-11T00:00:00.000Z',
+      closed_at: '2026-04-12T00:00:00.000Z',
+      merged_at: '2026-04-12T00:00:00.000Z'
+    });
+  };
+
+  const pullRequests = await fetchPullRequests({
+    repo: 'acme/demo',
+    author: 'alice',
+    state: 'merged',
+    limit: 1,
+    sort: 'created',
+    order: 'desc',
+    fetchImpl,
+    token: 'expired-token'
+  });
+
+  assert.deepEqual(
+    pullRequests.map((pr) => ({ number: pr.number, labels: pr.labels })),
+    [{ number: 42, labels: ['docs'] }]
+  );
+  assert.deepEqual(authHeaders, ['Bearer expired-token', null, null]);
 });
 
 test('fetchPullRequestsForAuthors merges and globally sorts multiple author streams', async () => {

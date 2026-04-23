@@ -60,6 +60,29 @@ function normalizeAreaList(areas) {
   return parseAreaFilter(areas);
 }
 
+function normalizeLabelList(labels) {
+  if (!labels) {
+    return [];
+  }
+
+  const values = Array.isArray(labels) ? labels : splitCommaSeparated(labels, 'label');
+
+  return [
+    ...new Set(
+      values
+        .map((label) => {
+          if (typeof label === 'string') {
+            return label;
+          }
+
+          return label?.name;
+        })
+        .map((label) => String(label || '').trim().toLowerCase())
+        .filter(Boolean)
+    )
+  ];
+}
+
 export function getKnownAreas() {
   return [...KNOWN_AREAS];
 }
@@ -129,7 +152,55 @@ export function parseAreaFilter(value) {
   return areas;
 }
 
-export function inferArea(title) {
+export function parseLabelFilter(value) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return [];
+  }
+
+  return normalizeLabelList(value);
+}
+
+export function inferArea(title, labels = []) {
+  const normalizedLabels = normalizeLabelList(labels);
+
+  if (
+    normalizedLabels.some((label) => ['agents-extensions', 'extensions', 'ai-sdk'].includes(label))
+  ) {
+    return 'agents-extensions';
+  }
+
+  if (
+    normalizedLabels.some((label) =>
+      ['agents-realtime', 'realtime', 'vad', 'sip', 'voice'].includes(label)
+    )
+  ) {
+    return 'agents-realtime';
+  }
+
+  if (
+    normalizedLabels.some((label) => ['agents-core', 'core', 'mcp', 'runstate'].includes(label))
+  ) {
+    return 'agents-core';
+  }
+
+  if (
+    normalizedLabels.some((label) => ['docs', 'documentation', 'readme', 'examples'].includes(label))
+  ) {
+    return 'docs';
+  }
+
+  if (normalizedLabels.some((label) => ['test', 'tests', 'coverage', 'qa'].includes(label))) {
+    return 'tests';
+  }
+
+  if (
+    normalizedLabels.some((label) =>
+      ['maintenance', 'chore', 'ci', 'workflow', 'dependencies'].includes(label)
+    )
+  ) {
+    return 'maintenance';
+  }
+
   for (const rule of AREA_RULES) {
     if (rule.patterns.some((pattern) => pattern.test(title))) {
       return rule.area;
@@ -151,7 +222,7 @@ export function summarizePullRequests(pullRequests) {
   const byArea = new Map();
 
   for (const pr of pullRequests) {
-    const area = pr.area || inferArea(pr.title);
+    const area = pr.area || inferArea(pr.title, pr.labels);
     byArea.set(area, (byArea.get(area) || 0) + 1);
   }
 
@@ -184,6 +255,20 @@ export function summarizeAuthors(pullRequests) {
   return Array.from(byAuthor.entries())
     .map(([author, count]) => ({ author, count }))
     .sort((left, right) => right.count - left.count || left.author.localeCompare(right.author));
+}
+
+export function summarizeLabels(pullRequests) {
+  const byLabel = new Map();
+
+  for (const pr of pullRequests) {
+    for (const label of normalizeLabelList(pr.labels)) {
+      byLabel.set(label, (byLabel.get(label) || 0) + 1);
+    }
+  }
+
+  return Array.from(byLabel.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
 }
 
 export function normalizeFormat(value) {
@@ -314,7 +399,19 @@ export function filterPullRequestsByArea(pullRequests, { areas }) {
   }
 
   const areaSet = new Set(normalizedAreas);
-  return pullRequests.filter((pr) => areaSet.has(pr.area || inferArea(pr.title)));
+  return pullRequests.filter((pr) => areaSet.has(pr.area || inferArea(pr.title, pr.labels)));
+}
+
+export function filterPullRequestsByLabels(pullRequests, { labels }) {
+  const normalizedLabels = normalizeLabelList(labels);
+
+  if (normalizedLabels.length === 0) {
+    return pullRequests;
+  }
+
+  const labelSet = new Set(normalizedLabels);
+
+  return pullRequests.filter((pr) => normalizeLabelList(pr.labels).some((label) => labelSet.has(label)));
 }
 
 export function sortPullRequests(pullRequests, { sort, order }) {
@@ -340,7 +437,8 @@ export function buildSummaryPayload({
   until,
   sort,
   order,
-  areas
+  areas,
+  labels
 }) {
   const payload = {
     repo,
@@ -351,7 +449,8 @@ export function buildSummaryPayload({
     order,
     byArea: summarizePullRequests(pullRequests),
     byState: summarizeStates(pullRequests),
-    byAuthor: summarizeAuthors(pullRequests)
+    byAuthor: summarizeAuthors(pullRequests),
+    byLabel: summarizeLabels(pullRequests)
   };
 
   if (since || until) {
@@ -366,6 +465,10 @@ export function buildSummaryPayload({
     payload.areaFilter = [...areas];
   }
 
+  if (labels && labels.length > 0) {
+    payload.labelFilter = [...labels];
+  }
+
   return payload;
 }
 
@@ -373,6 +476,7 @@ function appendMarkdownSummary(lines, { authors, state, pullRequests }) {
   const stateSummary = summarizeStates(pullRequests);
   const authorSummary = summarizeAuthors(pullRequests);
   const areaSummary = summarizePullRequests(pullRequests);
+  const labelSummary = summarizeLabels(pullRequests);
 
   if (authorSummary.length > 1 || authors.length > 1) {
     lines.push('## Author totals');
@@ -403,6 +507,16 @@ function appendMarkdownSummary(lines, { authors, state, pullRequests }) {
 
     lines.push('');
   }
+
+  if (labelSummary.length > 0) {
+    lines.push('## Labels');
+
+    for (const item of labelSummary) {
+      lines.push(`- ${item.label}: ${item.count}`);
+    }
+
+    lines.push('');
+  }
 }
 
 export function toMarkdown({
@@ -415,6 +529,7 @@ export function toMarkdown({
   sort,
   order,
   areas = [],
+  labels = [],
   summaryOnly = false
 }) {
   const lines = [
@@ -429,6 +544,10 @@ export function toMarkdown({
 
   if (areas.length > 0) {
     lines.push(`- Area filter: ${formatList(areas)}`);
+  }
+
+  if (labels.length > 0) {
+    lines.push(`- Label filter: ${formatList(labels)}`);
   }
 
   if (since || until) {
@@ -452,7 +571,10 @@ export function toMarkdown({
   }
 
   for (const pr of pullRequests) {
-    lines.push(`- [#${pr.number}](${pr.url}) [${pr.state}] [${pr.area}] @${pr.author}: ${pr.title}`);
+    const labelSuffix = pr.labels?.length ? ` [labels: ${formatList(pr.labels)}]` : '';
+    lines.push(
+      `- [#${pr.number}](${pr.url}) [${pr.state}] [${pr.area}]${labelSuffix} @${pr.author}: ${pr.title}`
+    );
   }
 
   return `${lines.join('\n')}\n`;
@@ -487,6 +609,7 @@ export function toTable({
   sort,
   order,
   areas = [],
+  labels = [],
   summaryOnly = false
 }) {
   const sections = [
@@ -502,6 +625,10 @@ export function toTable({
     sections.push(`Area filter: ${formatList(areas)}`);
   }
 
+  if (labels.length > 0) {
+    sections.push(`Label filter: ${formatList(labels)}`);
+  }
+
   if (since || until) {
     sections.push(`Date window (${getDateLabelForState(state)}): ${since || '...'} -> ${until || '...'}`);
   }
@@ -509,6 +636,7 @@ export function toTable({
   const authorSummary = summarizeAuthors(pullRequests);
   const stateSummary = summarizeStates(pullRequests);
   const areaSummary = summarizePullRequests(pullRequests);
+  const labelSummary = summarizeLabels(pullRequests);
 
   if (authorSummary.length > 1 || authors.length > 1) {
     sections.push('');
@@ -543,9 +671,22 @@ export function toTable({
     );
   }
 
+  if (labelSummary.length > 0) {
+    sections.push('');
+    sections.push('Label totals');
+    sections.push(
+      renderTable([
+        ['Label', 'Count'],
+        ...labelSummary.map((item) => [item.label, String(item.count)])
+      ])
+    );
+  }
+
   if (summaryOnly) {
     return `${sections.join('\n')}\n`;
   }
+
+  const includeLabelsColumn = pullRequests.some((pr) => pr.labels && pr.labels.length > 0);
 
   sections.push('');
   sections.push('Pull requests');
@@ -557,15 +698,22 @@ export function toTable({
 
   sections.push(
     renderTable([
-      ['Number', 'Author', 'Area', 'State', 'Created', 'Title'],
-      ...pullRequests.map((pr) => [
-        `#${pr.number}`,
-        pr.author,
-        pr.area,
-        pr.state,
-        pr.createdAt.slice(0, 10),
-        pr.title
-      ])
+      includeLabelsColumn
+        ? ['Number', 'Author', 'Area', 'Labels', 'State', 'Created', 'Title']
+        : ['Number', 'Author', 'Area', 'State', 'Created', 'Title'],
+      ...pullRequests.map((pr) =>
+        includeLabelsColumn
+          ? [
+              `#${pr.number}`,
+              pr.author,
+              pr.area,
+              formatList(pr.labels || []),
+              pr.state,
+              pr.createdAt.slice(0, 10),
+              pr.title
+            ]
+          : [`#${pr.number}`, pr.author, pr.area, pr.state, pr.createdAt.slice(0, 10), pr.title]
+      )
     ])
   );
 
@@ -588,6 +736,7 @@ export function toCsv({ pullRequests }) {
       'number',
       'author',
       'area',
+      'labels',
       'state',
       'createdAt',
       'updatedAt',
@@ -600,6 +749,7 @@ export function toCsv({ pullRequests }) {
       pr.number,
       pr.author,
       pr.area,
+      formatList(pr.labels || []),
       pr.state,
       pr.createdAt,
       pr.updatedAt,
@@ -622,7 +772,8 @@ export function toReleaseNotes({
   until,
   sort,
   order,
-  areas = []
+  areas = [],
+  labels = []
 }) {
   const lines = [
     `# Release Notes for ${repo}`,
@@ -635,6 +786,10 @@ export function toReleaseNotes({
 
   if (areas.length > 0) {
     lines.push(`- Area filter: ${formatList(areas)}`);
+  }
+
+  if (labels.length > 0) {
+    lines.push(`- Label filter: ${formatList(labels)}`);
   }
 
   if (since || until) {
@@ -653,7 +808,7 @@ export function toReleaseNotes({
   const grouped = new Map();
 
   for (const pr of pullRequests) {
-    const area = pr.area || inferArea(pr.title);
+    const area = pr.area || inferArea(pr.title, pr.labels);
 
     if (!grouped.has(area)) {
       grouped.set(area, []);
@@ -711,12 +866,27 @@ export async function getAccessToken({ execFileSync }) {
 }
 
 async function readJson(response) {
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`GitHub API request failed with ${response.status}: ${body}`);
+  const body = await response.text();
+  let payload;
+
+  try {
+    payload = body ? JSON.parse(body) : null;
+  } catch {
+    payload = null;
   }
 
-  return response.json();
+  if (!response.ok) {
+    const error = new Error(`GitHub API request failed with ${response.status}: ${body}`);
+    error.status = response.status;
+    error.body = body;
+    throw error;
+  }
+
+  if (payload === null) {
+    throw new Error('GitHub API returned an empty or invalid JSON response.');
+  }
+
+  return payload;
 }
 
 function buildHeaders(token) {
@@ -741,7 +911,7 @@ async function fetchSearchPage({
   sort,
   order,
   fetchImpl,
-  headers
+  requestState
 }) {
   const url = new URL('https://api.github.com/search/issues');
   url.searchParams.set('q', buildSearchQuery({ repo, author, state }));
@@ -750,22 +920,30 @@ async function fetchSearchPage({
   url.searchParams.set('sort', sort);
   url.searchParams.set('order', order);
 
-  const payload = await readJson(await fetchImpl(url, { headers }));
+  const payload = await requestJson({ url, fetchImpl, requestState, allowAnonymousFallback: true });
   return payload.items || [];
 }
 
-async function fetchPullRequestDetail({ repo, number, fetchImpl, headers }) {
+async function fetchPullRequestDetail({ repo, number, fetchImpl, requestState }) {
   const detailUrl = new URL(`https://api.github.com/repos/${repo}/pulls/${number}`);
-  return readJson(await fetchImpl(detailUrl, { headers }));
+  return requestJson({
+    url: detailUrl,
+    fetchImpl,
+    requestState,
+    allowAnonymousFallback: true
+  });
 }
 
-function normalizePullRequest(detail) {
+function normalizePullRequest(detail, { labels = [] } = {}) {
+  const normalizedLabels = normalizeLabelList(detail.labels?.length ? detail.labels : labels);
+
   return {
     number: detail.number,
     title: detail.title,
     url: detail.html_url,
     author: detail.user?.login || 'unknown',
-    area: inferArea(detail.title),
+    area: inferArea(detail.title, normalizedLabels),
+    labels: normalizedLabels,
     state: canonicalizeState({
       state: detail.state,
       mergedAt: detail.merged_at
@@ -787,6 +965,7 @@ export async function fetchPullRequests({
   since,
   until,
   areas = [],
+  labels = [],
   fetchImpl,
   token
 }) {
@@ -796,9 +975,10 @@ export async function fetchPullRequests({
     throw new Error(`Invalid limit "${limit}".`);
   }
 
-  const headers = buildHeaders(token);
   const dateRange = normalizeDateRange({ since, until });
   const normalizedAreas = normalizeAreaList(areas);
+  const normalizedLabels = normalizeLabelList(labels);
+  const requestState = { token };
   const results = [];
   const seen = new Set();
   const pageSize = Math.min(normalizedLimit, 100);
@@ -814,35 +994,43 @@ export async function fetchPullRequests({
       sort,
       order,
       fetchImpl,
-      headers
+      requestState
     });
 
     if (items.length === 0) {
       break;
     }
 
-    const nextNumbers = items
-      .map((item) => item.number)
-      .filter((number) => !seen.has(number));
+    const nextItems = items.filter((item) => !seen.has(item.number));
 
-    for (const number of nextNumbers) {
-      seen.add(number);
+    for (const item of nextItems) {
+      seen.add(item.number);
     }
 
     const detailedPullRequests = await Promise.all(
-      nextNumbers.map((number) => fetchPullRequestDetail({ repo, number, fetchImpl, headers }))
+      nextItems.map(async (item) => {
+        const detail = await fetchPullRequestDetail({
+          repo,
+          number: item.number,
+          fetchImpl,
+          requestState
+        });
+
+        return normalizePullRequest(detail, { labels: item.labels });
+      })
     );
 
-    const normalizedPullRequests = detailedPullRequests
-      .map((detail) => normalizePullRequest(detail))
-      .filter((pr) => state === 'all' || pr.state === state);
+    const normalizedPullRequests = detailedPullRequests.filter((pr) => state === 'all' || pr.state === state);
 
-    const filteredPullRequests = filterPullRequestsByArea(
-      filterPullRequestsByDateRange(normalizedPullRequests, {
-        state,
-        ...dateRange
-      }),
-      { areas: normalizedAreas }
+    const filteredPullRequests = filterPullRequestsByLabels(
+      filterPullRequestsByArea(
+        filterPullRequestsByDateRange(normalizedPullRequests, {
+          state,
+          ...dateRange
+        }),
+        { areas: normalizedAreas }
+      ),
+      { labels: normalizedLabels }
     );
 
     for (const pr of filteredPullRequests) {
@@ -873,6 +1061,7 @@ export async function fetchPullRequestsForAuthors({
   since,
   until,
   areas = [],
+  labels = [],
   fetchImpl,
   token
 }) {
@@ -895,6 +1084,7 @@ export async function fetchPullRequestsForAuthors({
         since,
         until,
         areas,
+        labels,
         fetchImpl,
         token
       })
@@ -910,4 +1100,44 @@ export async function fetchPullRequestsForAuthors({
   }
 
   return sortPullRequests([...deduped.values()], { sort, order }).slice(0, normalizedLimit);
+}
+
+function shouldRetryWithoutAuth(error, token) {
+  if (!token) {
+    return false;
+  }
+
+  if (error.status === 401) {
+    return true;
+  }
+
+  if (error.status !== 403) {
+    return false;
+  }
+
+  return /bad credentials|token.*expired|token.*revoked|authentication/i.test(error.body);
+}
+
+async function requestJson({ url, fetchImpl, requestState, allowAnonymousFallback = false }) {
+  const response = await fetchImpl(url, { headers: buildHeaders(requestState.token) });
+
+  try {
+    return await readJson(response);
+  } catch (error) {
+    if (typeof error.status !== 'number') {
+      throw error;
+    }
+
+    const responseError = {
+      status: error.status,
+      body: String(error.body || '').trim()
+    };
+
+    if (allowAnonymousFallback && shouldRetryWithoutAuth(responseError, requestState.token)) {
+      requestState.token = undefined;
+      return readJson(await fetchImpl(url, { headers: buildHeaders(undefined) }));
+    }
+
+    throw error;
+  }
 }

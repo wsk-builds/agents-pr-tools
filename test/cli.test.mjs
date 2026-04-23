@@ -19,7 +19,7 @@ function jsonResponse(payload, status = 200) {
   };
 }
 
-test('parseArgs handles multi-author and area filter options', () => {
+test('parseArgs handles multi-author, area, and label filter options', () => {
   assert.deepEqual(
     parseArgs([
       '--repo',
@@ -42,6 +42,8 @@ test('parseArgs handles multi-author and area filter options', () => {
       '2026-04-30',
       '--area',
       'docs,tests',
+      '--label',
+      'bug,docs',
       '--output',
       'reports/out.md',
       '--summary-only'
@@ -57,6 +59,7 @@ test('parseArgs handles multi-author and area filter options', () => {
       since: '2026-04-01',
       until: '2026-04-30',
       area: 'docs,tests',
+      label: 'bug,docs',
       output: 'reports/out.md',
       summaryOnly: true
     }
@@ -80,7 +83,7 @@ test('main resolves @me and renders summary-only json through injected dependenc
 
     if (requestUrl.pathname === '/search/issues') {
       return jsonResponse({
-        items: [{ number: 42 }]
+        items: [{ number: 42, labels: [{ name: 'docs' }] }]
       });
     }
 
@@ -125,7 +128,8 @@ test('main resolves @me and renders summary-only json through injected dependenc
     order: 'desc',
     byArea: [{ area: 'docs', count: 1 }],
     byState: [{ state: 'merged', count: 1 }],
-    byAuthor: [{ author: 'alice', count: 1 }]
+    byAuthor: [{ author: 'alice', count: 1 }],
+    byLabel: [{ label: 'docs', count: 1 }]
   });
 });
 
@@ -143,7 +147,7 @@ test('main writes rendered output to --output targets', async () => {
 
     if (requestUrl.pathname === '/search/issues') {
       return jsonResponse({
-        items: [{ number: 42 }]
+        items: [{ number: 42, labels: [{ name: 'docs' }] }]
       });
     }
 
