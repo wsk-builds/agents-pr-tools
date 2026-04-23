@@ -13,10 +13,12 @@ This project provides a zero-dependency Node.js CLI that:
 - paginates and sorts results for stable reporting
 - distinguishes merged PRs from closed-but-unmerged PRs
 - filters reports to a date window and one or more inferred work areas
+- filters reports to one or more GitHub labels with case-insensitive matching
 - groups work by rough area inferred from the PR title
 - renders output as Markdown, a plain-text table, raw JSON, CSV, or release-notes Markdown
 - writes reports directly to disk when you pass `--output`
 - supports compact summary-only reports
+- retries public GitHub reads without auth when a saved token has gone stale
 
 ## Use cases
 
@@ -61,7 +63,19 @@ node src/cli.mjs \
   --format release-notes
 ```
 
+Label-focused reporting:
+
+```bash
+node src/cli.mjs \
+  --repo openai/openai-agents-js \
+  --author wsk-builds \
+  --state merged \
+  --label docs,bug \
+  --format table
+```
+
 The CLI will use `GITHUB_TOKEN` or `GH_TOKEN` when present. If neither is set, it will try `gh auth token`.
+For public repositories, if that token is expired or invalid, the tool retries the read request without authentication. `--author @me` still requires a valid authenticated GitHub user.
 
 Write a report directly to a file:
 
@@ -103,6 +117,7 @@ node src/cli.mjs \
 - `--since <date>`: start date in ISO-8601 format
 - `--until <date>`: end date in ISO-8601 format
 - `--area <name[,name...]>`: filter by inferred area
+- `--label <name[,name...]>`: filter by one or more GitHub labels
 - `--output <path>`: write the rendered report to a file (`-` keeps stdout)
 - `--summary-only`: render only the summary sections
 - `--help`: show usage
@@ -124,9 +139,11 @@ Known inferred areas:
 - `closed` means closed but not merged.
 - `open` and `all` date filters use the PR created timestamp.
 - Full JSON output remains a raw PR list. Summary-only JSON emits a compact summary object instead.
+- Full JSON and CSV row output include normalized label names.
 - `csv` exports full row data for spreadsheet workflows.
 - `release-notes` emits grouped Markdown suitable for changelogs or application materials.
 - `--output` creates parent directories automatically before writing the report file.
+- Public-repo reads retry without auth if the configured token is invalid, but `@me` still requires valid authentication.
 
 ## Development
 

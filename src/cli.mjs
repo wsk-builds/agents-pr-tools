@@ -15,6 +15,7 @@ import {
   normalizeSort,
   normalizeState,
   parseAreaFilter,
+  parseLabelFilter,
   parseRepo,
   resolveAuthorLogins,
   toCsv,
@@ -40,6 +41,7 @@ export function usage() {
     '  --since <date>                         Start date filter in ISO-8601 format.',
     '  --until <date>                         End date filter in ISO-8601 format.',
     `  --area <name[,name...]>                Filter by inferred area. Known areas: ${getKnownAreas().join(', ')}.`,
+    '  --label <name[,name...]>               Filter by one or more GitHub labels.',
     '  --output <path>                        Write the report to a file. Use - for stdout.',
     '  --summary-only                         Omit the full PR list and render only summaries.',
     '  --help                                 Show this help text.',
@@ -114,6 +116,8 @@ export function parseArgs(argv) {
       options.until = value;
     } else if (arg === '--area') {
       options.area = value;
+    } else if (arg === '--label') {
+      options.label = value;
     } else if (arg === '--output') {
       options.output = value;
     } else {
@@ -138,6 +142,7 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
 
   const repo = parseRepo(options.repo).fullName;
   const areas = parseAreaFilter(options.area);
+  const labels = parseLabelFilter(options.label);
   const state = normalizeState(options.state);
   const format = normalizeFormat(options.format);
   const sort = normalizeSort(options.sort);
@@ -170,6 +175,7 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
     since: dateRange.since,
     until: dateRange.until,
     areas,
+    labels,
     fetchImpl,
     token
   });
@@ -184,6 +190,7 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
     sort,
     order,
     areas,
+    labels,
     summaryOnly: options.summaryOnly
   };
 
