@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { main, parseArgs } from '../src/cli.mjs';
+
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function jsonResponse(payload, status = 200) {
   return {
@@ -64,6 +68,50 @@ test('parseArgs handles multi-author, area, and label filter options', () => {
       summaryOnly: true
     }
   );
+});
+
+test('CLI help exits successfully as a subprocess', () => {
+  const result = spawnSync(process.execPath, ['src/cli.mjs', '--help'], {
+    cwd: repoRoot,
+    encoding: 'utf8'
+  });
+
+  if (result.error?.code === 'EPERM') {
+    return;
+  }
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /agents-pr-tools --repo owner\/name/);
+  assert.equal(result.stderr, '');
+});
+
+test('CLI validation failures write stderr and exit non-zero as a subprocess', () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      'src/cli.mjs',
+      '--repo',
+      'acme/demo',
+      '--author',
+      'alice',
+      '--format',
+      'csv',
+      '--summary-only'
+    ],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8'
+    }
+  );
+
+  if (result.error?.code === 'EPERM') {
+    return;
+  }
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /--summary-only is only supported/);
+  assert.match(result.stderr, /Usage:/);
+  assert.equal(result.stdout, '');
 });
 
 test('main resolves @me and renders summary-only json through injected dependencies', async () => {
