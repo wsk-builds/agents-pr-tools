@@ -1,45 +1,65 @@
 # agents-pr-tools
 
-Small GitHub PR reporting utilities for upstream contributors and maintainers.
+Small, dependency-free GitHub pull request reporting utilities for contributors, maintainers, and release note workflows.
 
-## Why this exists
+`agents-pr-tools` turns public GitHub PR history into Markdown summaries, tables, JSON, CSV, or release-note style output. It is designed for cases where you need a fast, verifiable summary of upstream work: profile README updates, maintainer applications, weekly reports, changelog drafts, or lightweight OSS contribution audits.
 
-When you contribute to an upstream repository through a working fork, you often need a fast way to turn your public PR history into a short, verifiable summary for a profile README, an application, or release notes.
+## Highlights
 
-This project provides a zero-dependency Node.js CLI that:
+- Query pull requests by repository and one or more authors.
+- Resolve the authenticated GitHub user with `--author @me`.
+- Distinguish merged PRs from closed-but-unmerged PRs.
+- Filter by state, date window, inferred work area, and GitHub labels.
+- Render Markdown, plain-text tables, JSON, CSV, or release-notes Markdown.
+- Write reports directly to disk with `--output`.
+- Generate compact summary-only reports for Markdown, table, and JSON output.
+- Use `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token` automatically when available.
+- Retry public reads without authentication when a saved token is stale.
+- Harden GitHub API reads with request timeouts, transient retries, and rate-limit-aware error messages.
+- Run without third-party runtime dependencies.
 
-- fetches PRs for one or more authors in a given repository
-- resolves the authenticated GitHub viewer with `--author @me`
-- paginates and sorts results for stable reporting
-- distinguishes merged PRs from closed-but-unmerged PRs
-- filters reports to a date window and one or more inferred work areas
-- filters reports to one or more GitHub labels with case-insensitive matching
-- groups work by rough area inferred from the PR title
-- renders output as Markdown, a plain-text table, raw JSON, CSV, or release-notes Markdown
-- writes reports directly to disk when you pass `--output`
-- supports compact summary-only reports
-- retries public GitHub reads without auth when a saved token has gone stale
+## Requirements
 
-## Use cases
+- Node.js 22 or newer.
+- Optional GitHub authentication through one of:
+  - `GITHUB_TOKEN`
+  - `GH_TOKEN`
+  - `gh auth login`
 
-- profile README updates
-- upstream contribution summaries
-- maintainer application notes
-- lightweight OSS activity reporting
+Authentication is recommended because GitHub rate limits anonymous API requests more aggressively. `--author @me` always requires valid authentication because the tool must resolve the current GitHub user.
 
-## Quick start
+## Quick Start
 
-```bash
-node src/cli.mjs --repo openai/openai-agents-js --author wsk-builds --state merged --limit 20 --format markdown
-```
-
-Using your current authenticated GitHub account:
+Run from a local checkout:
 
 ```bash
-node src/cli.mjs --repo openai/openai-agents-js --author @me --state merged --summary-only
+node src/cli.mjs --repo openai/openai-agents-js --author wsk-builds
 ```
 
-Recent merged work only:
+Generate a compact summary for the authenticated account:
+
+```bash
+node src/cli.mjs \
+  --repo openai/openai-agents-js \
+  --author @me \
+  --state merged \
+  --summary-only
+```
+
+Write the report to a file:
+
+```bash
+node src/cli.mjs \
+  --repo openai/openai-agents-js \
+  --author @me \
+  --state merged \
+  --summary-only \
+  --output reports/openai-agents-js-summary.md
+```
+
+## Examples
+
+### Recent merged work
 
 ```bash
 node src/cli.mjs \
@@ -52,7 +72,9 @@ node src/cli.mjs \
   --format markdown
 ```
 
-Multi-author release notes for docs and tests work:
+For `merged` reports, the date window is applied to the PR merged timestamp.
+
+### Multi-author release notes
 
 ```bash
 node src/cli.mjs \
@@ -63,7 +85,9 @@ node src/cli.mjs \
   --format release-notes
 ```
 
-Label-focused reporting:
+`release-notes` groups matching PRs by inferred work area and renders Markdown suitable for changelogs or status reports.
+
+### Label-focused table
 
 ```bash
 node src/cli.mjs \
@@ -74,53 +98,57 @@ node src/cli.mjs \
   --format table
 ```
 
-The CLI will use `GITHUB_TOKEN` or `GH_TOKEN` when present. If neither is set, it will try `gh auth token`.
-For public repositories, if that token is expired or invalid, the tool retries the read request without authentication. `--author @me` still requires a valid authenticated GitHub user.
+Label filters are case-insensitive and use normalized label names.
 
-Write a report directly to a file:
+### Machine-readable summary
 
 ```bash
 node src/cli.mjs \
   --repo openai/openai-agents-js \
-  --author @me \
+  --author wsk-builds \
+  --state all \
+  --format json \
+  --summary-only
+```
+
+Full JSON output returns the normalized PR list. Summary-only JSON returns totals by area, state, author, and label.
+
+### Spreadsheet export
+
+```bash
+node src/cli.mjs \
+  --repo openai/openai-agents-js \
+  --author wsk-builds \
   --state merged \
-  --summary-only \
-  --output reports/openai-agents-js-summary.md
+  --format csv \
+  --output reports/prs.csv
 ```
 
-## Example output
+CSV output always renders full row data.
 
-```md
-# Pull Request Summary for wsk-builds
+## CLI Reference
 
-- Repository: openai/openai-agents-js
-- Author: wsk-builds
-- State filter: merged
-- Total PRs: 7
-- Sort: created desc
+```text
+Usage:
+  agents-pr-tools --repo owner/name --author login[,login...] [options]
 
-## Work areas
-- agents-extensions: 3
-- docs: 3
-- agents-realtime: 1
+Options:
+  --repo <owner/name>                     Target repository.
+  --author <login[,login...]>            One or more GitHub author logins. Use @me for the authenticated viewer.
+  --state <merged|open|closed|all>       Pull request state filter. Default: merged.
+  --limit <n>                            Maximum number of PRs to fetch. Default: 20.
+  --format <markdown|table|json|csv|release-notes>
+                                         Output format. Default: markdown.
+  --sort <created|updated>               Search sort field. Default: created.
+  --order <desc|asc>                     Search order. Default: desc.
+  --since <date>                         Start date filter in ISO-8601 format.
+  --until <date>                         End date filter in ISO-8601 format.
+  --area <name[,name...]>                Filter by inferred area.
+  --label <name[,name...]>               Filter by one or more GitHub labels.
+  --output <path>                        Write the report to a file. Use - for stdout.
+  --summary-only                         Omit the full PR list and render only summaries.
+  --help                                 Show help text.
 ```
-
-## CLI options
-
-- `--repo <owner/name>`: target repository
-- `--author <login[,login...]>`: one or more GitHub author logins
-- `--state <merged|open|closed|all>`: PR state filter
-- `--limit <n>`: maximum number of PRs to fetch
-- `--format <markdown|table|json|csv|release-notes>`: output format
-- `--sort <created|updated>`: GitHub search sort field
-- `--order <desc|asc>`: sort direction
-- `--since <date>`: start date in ISO-8601 format
-- `--until <date>`: end date in ISO-8601 format
-- `--area <name[,name...]>`: filter by inferred area
-- `--label <name[,name...]>`: filter by one or more GitHub labels
-- `--output <path>`: write the rendered report to a file (`-` keeps stdout)
-- `--summary-only`: render only the summary sections
-- `--help`: show usage
 
 Known inferred areas:
 
@@ -132,27 +160,98 @@ Known inferred areas:
 - `maintenance`
 - `other`
 
-## Reporting behavior
+## Reporting Behavior
 
-- `@me` resolves the currently authenticated GitHub user and requires `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth login`.
-- `merged` reports use the PR merged timestamp for `--since` and `--until`.
-- `closed` means closed but not merged.
-- `open` and `all` date filters use the PR created timestamp.
-- Full JSON output remains a raw PR list. Summary-only JSON emits a compact summary object instead.
-- Full JSON and CSV row output include normalized label names.
-- `csv` exports full row data for spreadsheet workflows.
-- `release-notes` emits grouped Markdown suitable for changelogs or application materials.
-- `--output` creates parent directories automatically before writing the report file.
-- Public-repo reads retry without auth if the configured token is invalid, but `@me` still requires valid authentication.
+- `merged` reports include PRs that GitHub reports as merged.
+- `closed` reports mean closed but not merged.
+- `open` reports include currently open PRs.
+- `all` reports include open, closed, and merged PRs.
+- `merged` date filters use the merged timestamp.
+- `closed` date filters use the closed timestamp.
+- `open` and `all` date filters use the created timestamp.
+- `csv` and `release-notes` always render full output and do not support `--summary-only`.
+- `--summary-only` is supported only with `markdown`, `table`, and `json`.
+- `--output` creates parent directories automatically.
+
+Area detection is heuristic. The tool looks at normalized labels first, then PR title prefixes and keywords. Unknown work is grouped as `other`.
+
+## Authentication and Reliability
+
+The CLI automatically looks for credentials in this order:
+
+1. `GITHUB_TOKEN`
+2. `GH_TOKEN`
+3. `gh auth token`
+
+When a token is present, GitHub API calls include it as a bearer token. If a public repository read fails because the token is expired, revoked, or otherwise invalid, the tool retries that public read without authentication. This makes local reports more resilient when an old `gh` token is still configured.
+
+GitHub API requests are hardened with:
+
+- a default request timeout
+- retries for transient network failures
+- retries for `408`, `429`, `5xx`, and secondary rate-limit responses
+- `Retry-After` support when GitHub provides it
+- error messages that include rate-limit reset details when available
+
+## Output Shape
+
+Normalized PR rows include:
+
+- PR number
+- title
+- URL
+- author
+- inferred area
+- normalized labels
+- normalized state
+- created, updated, closed, and merged timestamps
+
+Summary output includes:
+
+- repository
+- authors
+- state filter
+- total PR count
+- sort order
+- totals by work area
+- totals by state
+- totals by author
+- totals by label
+- optional date, area, and label filters
 
 ## Development
 
+Run syntax checks:
+
 ```bash
-node --test
+npm run check
+```
+
+Run tests:
+
+```bash
+npm test
+```
+
+Run tests with Node's built-in coverage report:
+
+```bash
+npm run test:coverage
+```
+
+Smoke-test the CLI help output:
+
+```bash
 node src/cli.mjs --help
 ```
 
-## Notes
+## CI
 
-- Area grouping is heuristic and based on PR title prefixes and keywords.
-- The tool is intentionally dependency-free so it can run in minimal environments.
+The GitHub Actions workflow runs on Node.js 22 and 24. It validates syntax, runs the test suite, runs the built-in Node coverage report, and smoke-tests the CLI help command.
+
+## Design Notes
+
+- The project intentionally avoids runtime dependencies.
+- The CLI and library code are written as native ES modules.
+- Tests use the built-in `node:test` runner.
+- Network behavior is tested with injected fake `fetch` implementations, so the test suite does not require live GitHub API calls.
