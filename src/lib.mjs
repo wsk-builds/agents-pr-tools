@@ -12,6 +12,9 @@ const VALID_STATES = new Set(['merged', 'open', 'closed', 'all']);
 const VALID_FORMATS = new Set(['markdown', 'table', 'json', 'csv', 'release-notes']);
 const VALID_SORTS = new Set(['created', 'updated']);
 const VALID_ORDERS = new Set(['desc', 'asc']);
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_MAX_RETRIES = 2;
+const DEFAULT_RETRY_DELAY_MS = 250;
 
 function splitCommaSeparated(value, fieldName) {
   const trimmed = String(value || '').trim();
@@ -39,6 +42,12 @@ function formatList(values) {
 function compareStrings(left, right, order) {
   const comparison = left.localeCompare(right);
   return order === 'asc' ? comparison : -comparison;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function normalizeAreaList(areas) {
@@ -109,11 +118,16 @@ export async function fetchViewerLogin({ fetchImpl, token }) {
     );
   }
 
-  const payload = await readJson(
-    await fetchImpl(new URL('https://api.github.com/user'), {
-      headers: buildHeaders(token)
-    })
-  );
+  const payload = await requestJson({
+    url: new URL('https://api.github.com/user'),
+    fetchImpl,
+    requestState: {
+      token,
+      requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+      maxRetries: DEFAULT_MAX_RETRIES,
+      retryDelayMs: DEFAULT_RETRY_DELAY_MS
+    }
+  });
 
   const login = String(payload.login || '')
     .trim()
@@ -865,6 +879,66 @@ export async function getAccessToken({ execFileSync }) {
   }
 }
 
+function getHeader(headers, name) {
+  if (!headers) {
+    return undefined;
+  }
+
+  if (typeof headers.get === 'function') {
+    return headers.get(name) || undefined;
+  }
+
+  const lowerName = name.toLowerCase();
+  const entry = Object.entries(headers).find(([key]) => key.toLowerCase() === lowerName);
+  return entry ? String(entry[1]) : undefined;
+}
+
+function getRateLimitDetails(response) {
+  const retryAfter = getHeader(response.headers, 'retry-after');
+  const remaining = getHeader(response.headers, 'x-ratelimit-remaining');
+  const reset = getHeader(response.headers, 'x-ratelimit-reset');
+  const details = [];
+
+  if (retryAfter) {
+    details.push(`retry-after=${retryAfter}s`);
+  }
+
+  if (remaining) {
+    details.push(`rate-limit-remaining=${remaining}`);
+  }
+
+  if (reset) {
+    const resetTime = new Date(Number.parseInt(reset, 10) * 1000);
+    details.push(
+      Number.isNaN(resetTime.getTime())
+        ? `rate-limit-reset=${reset}`
+        : `rate-limit-reset=${resetTime.toISOString()}`
+    );
+  }
+
+  return details.join(', ');
+}
+
+function parseRetryAfterMs(value) {
+  if (!value) {
+    return undefined;
+  }
+
+  const seconds = Number.parseFloat(value);
+
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return seconds * 1000;
+  }
+
+  const date = new Date(value);
+
+  if (!Number.isNaN(date.getTime())) {
+    return Math.max(0, date.getTime() - Date.now());
+  }
+
+  return undefined;
+}
+
 async function readJson(response) {
   const body = await response.text();
   let payload;
@@ -876,9 +950,13 @@ async function readJson(response) {
   }
 
   if (!response.ok) {
-    const error = new Error(`GitHub API request failed with ${response.status}: ${body}`);
+    const rateLimitDetails = getRateLimitDetails(response);
+    const suffix = rateLimitDetails ? ` (${rateLimitDetails})` : '';
+    const error = new Error(`GitHub API request failed with ${response.status}: ${body}${suffix}`);
     error.status = response.status;
     error.body = body;
+    error.retryAfterMs = parseRetryAfterMs(getHeader(response.headers, 'retry-after'));
+    error.rateLimitRemaining = getHeader(response.headers, 'x-ratelimit-remaining');
     throw error;
   }
 
@@ -967,7 +1045,10 @@ export async function fetchPullRequests({
   areas = [],
   labels = [],
   fetchImpl,
-  token
+  token,
+  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+  maxRetries = DEFAULT_MAX_RETRIES,
+  retryDelayMs = DEFAULT_RETRY_DELAY_MS
 }) {
   const normalizedLimit = Number.parseInt(String(limit), 10);
 
@@ -978,7 +1059,7 @@ export async function fetchPullRequests({
   const dateRange = normalizeDateRange({ since, until });
   const normalizedAreas = normalizeAreaList(areas);
   const normalizedLabels = normalizeLabelList(labels);
-  const requestState = { token };
+  const requestState = { token, requestTimeoutMs, maxRetries, retryDelayMs };
   const results = [];
   const seen = new Set();
   const pageSize = Math.min(normalizedLimit, 100);
@@ -1063,7 +1144,10 @@ export async function fetchPullRequestsForAuthors({
   areas = [],
   labels = [],
   fetchImpl,
-  token
+  token,
+  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+  maxRetries = DEFAULT_MAX_RETRIES,
+  retryDelayMs = DEFAULT_RETRY_DELAY_MS
 }) {
   const normalizedAuthors = Array.isArray(authors) ? authors : parseAuthorLogins(authors);
   const normalizedLimit = Number.parseInt(String(limit), 10);
@@ -1086,7 +1170,10 @@ export async function fetchPullRequestsForAuthors({
         areas,
         labels,
         fetchImpl,
-        token
+        token,
+        requestTimeoutMs,
+        maxRetries,
+        retryDelayMs
       })
     )
   );
@@ -1118,26 +1205,97 @@ function shouldRetryWithoutAuth(error, token) {
   return /bad credentials|token.*expired|token.*revoked|authentication/i.test(error.body);
 }
 
-async function requestJson({ url, fetchImpl, requestState, allowAnonymousFallback = false }) {
-  const response = await fetchImpl(url, { headers: buildHeaders(requestState.token) });
+function shouldRetryRequest(error) {
+  if (error.name === 'AbortError') {
+    return true;
+  }
+
+  if (
+    error.name === 'TypeError' ||
+    ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(error.code)
+  ) {
+    return true;
+  }
+
+  if (typeof error.status !== 'number') {
+    return false;
+  }
+
+  if (error.status === 408 || error.status === 429 || error.status >= 500) {
+    return true;
+  }
+
+  if (error.status !== 403) {
+    return false;
+  }
+
+  if (error.rateLimitRemaining === '0') {
+    return true;
+  }
+
+  return /secondary rate limit|rate limit exceeded|abuse detection/i.test(error.body);
+}
+
+function getRetryDelayMs(error, attempt, requestState) {
+  if (typeof error.retryAfterMs === 'number') {
+    return error.retryAfterMs;
+  }
+
+  return requestState.retryDelayMs * 2 ** attempt;
+}
+
+async function fetchWithTimeout(url, { fetchImpl, requestState }) {
+  const timeoutMs = requestState.requestTimeoutMs;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
 
   try {
-    return await readJson(response);
+    return await fetchImpl(url, {
+      headers: buildHeaders(requestState.token),
+      signal: controller.signal
+    });
   } catch (error) {
-    if (typeof error.status !== 'number') {
-      throw error;
-    }
-
-    const responseError = {
-      status: error.status,
-      body: String(error.body || '').trim()
-    };
-
-    if (allowAnonymousFallback && shouldRetryWithoutAuth(responseError, requestState.token)) {
-      requestState.token = undefined;
-      return readJson(await fetchImpl(url, { headers: buildHeaders(undefined) }));
+    if (error.name === 'AbortError') {
+      const timeoutError = new Error(`GitHub API request timed out after ${timeoutMs}ms.`);
+      timeoutError.name = 'AbortError';
+      throw timeoutError;
     }
 
     throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function requestJson({ url, fetchImpl, requestState, allowAnonymousFallback = false }) {
+  for (let attempt = 0; attempt <= requestState.maxRetries; attempt += 1) {
+    let response;
+
+    try {
+      response = await fetchWithTimeout(url, { fetchImpl, requestState });
+      return await readJson(response);
+    } catch (error) {
+      if (typeof error.status === 'number') {
+        const responseError = {
+          status: error.status,
+          body: String(error.body || '').trim()
+        };
+
+        if (allowAnonymousFallback && shouldRetryWithoutAuth(responseError, requestState.token)) {
+          requestState.token = undefined;
+          response = await fetchWithTimeout(url, { fetchImpl, requestState });
+          return readJson(response);
+        }
+      }
+
+      if (attempt < requestState.maxRetries && shouldRetryRequest(error)) {
+        await sleep(getRetryDelayMs(error, attempt, requestState));
+        continue;
+      }
+
+      throw error;
+    }
   }
 }

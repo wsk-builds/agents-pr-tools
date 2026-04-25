@@ -29,7 +29,9 @@
   },
   "scripts": {
     "start": "node src/cli.mjs",
-    "test": "node --test"
+    "check": "node --check src/cli.mjs && node --check src/lib.mjs",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage"
   },
   "engines": {
     "node": ">=22"

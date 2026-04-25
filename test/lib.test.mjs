@@ -32,10 +32,11 @@ import {
   toTable
 } from '../src/lib.mjs';
 
-function jsonResponse(payload, status = 200) {
+function jsonResponse(payload, status = 200, headers = {}) {
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers,
     async json() {
       return payload;
     },
@@ -478,6 +479,146 @@ test('fetchPullRequests retries public API reads without auth when the token is 
     [{ number: 42, labels: ['docs'] }]
   );
   assert.deepEqual(authHeaders, ['Bearer expired-token', null, null]);
+});
+
+test('fetchPullRequests retries transient GitHub API failures', async () => {
+  let searchCalls = 0;
+  const fetchImpl = async (url) => {
+    const requestUrl = new URL(url);
+
+    if (requestUrl.pathname === '/search/issues') {
+      searchCalls += 1;
+
+      if (searchCalls === 1) {
+        return jsonResponse({ message: 'Server error' }, 500);
+      }
+
+      return jsonResponse({
+        items: [{ number: 42, labels: [{ name: 'docs' }] }]
+      });
+    }
+
+    return jsonResponse({
+      number: 42,
+      title: 'docs: tighten README examples',
+      html_url: 'https://github.com/acme/demo/pull/42',
+      user: { login: 'alice' },
+      state: 'closed',
+      created_at: '2026-04-10T00:00:00.000Z',
+      updated_at: '2026-04-11T00:00:00.000Z',
+      closed_at: '2026-04-12T00:00:00.000Z',
+      merged_at: '2026-04-12T00:00:00.000Z'
+    });
+  };
+
+  const pullRequests = await fetchPullRequests({
+    repo: 'acme/demo',
+    author: 'alice',
+    state: 'merged',
+    limit: 1,
+    fetchImpl,
+    maxRetries: 1,
+    retryDelayMs: 0
+  });
+
+  assert.equal(searchCalls, 2);
+  assert.deepEqual(pullRequests.map((pr) => pr.number), [42]);
+});
+
+test('fetchPullRequests retries transient network failures', async () => {
+  let searchCalls = 0;
+  const fetchImpl = async (url) => {
+    const requestUrl = new URL(url);
+
+    if (requestUrl.pathname === '/search/issues') {
+      searchCalls += 1;
+
+      if (searchCalls === 1) {
+        throw new TypeError('fetch failed');
+      }
+
+      return jsonResponse({
+        items: [{ number: 42, labels: [{ name: 'docs' }] }]
+      });
+    }
+
+    return jsonResponse({
+      number: 42,
+      title: 'docs: tighten README examples',
+      html_url: 'https://github.com/acme/demo/pull/42',
+      user: { login: 'alice' },
+      state: 'closed',
+      created_at: '2026-04-10T00:00:00.000Z',
+      updated_at: '2026-04-11T00:00:00.000Z',
+      closed_at: '2026-04-12T00:00:00.000Z',
+      merged_at: '2026-04-12T00:00:00.000Z'
+    });
+  };
+
+  const pullRequests = await fetchPullRequests({
+    repo: 'acme/demo',
+    author: 'alice',
+    state: 'merged',
+    limit: 1,
+    fetchImpl,
+    maxRetries: 1,
+    retryDelayMs: 0
+  });
+
+  assert.equal(searchCalls, 2);
+  assert.deepEqual(pullRequests.map((pr) => pr.number), [42]);
+});
+
+test('fetchPullRequests reports GitHub rate limit metadata on failed requests', async () => {
+  const reset = Math.floor(Date.parse('2026-04-10T00:00:00.000Z') / 1000);
+  const fetchImpl = async () =>
+    jsonResponse(
+      { message: 'API rate limit exceeded' },
+      403,
+      {
+        'retry-after': '3',
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': String(reset)
+      }
+    );
+
+  await assert.rejects(
+    () =>
+      fetchPullRequests({
+        repo: 'acme/demo',
+        author: 'alice',
+        state: 'merged',
+        limit: 1,
+        fetchImpl,
+        maxRetries: 0
+      }),
+    /retry-after=3s, rate-limit-remaining=0, rate-limit-reset=2026-04-10T00:00:00.000Z/
+  );
+});
+
+test('fetchPullRequests times out hung GitHub API requests', async () => {
+  const fetchImpl = async (_url, { signal }) =>
+    new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      });
+    });
+
+  await assert.rejects(
+    () =>
+      fetchPullRequests({
+        repo: 'acme/demo',
+        author: 'alice',
+        state: 'merged',
+        limit: 1,
+        fetchImpl,
+        requestTimeoutMs: 1,
+        maxRetries: 0
+      }),
+    /GitHub API request timed out after 1ms/
+  );
 });
 
 test('fetchPullRequestsForAuthors merges and globally sorts multiple author streams', async () => {
