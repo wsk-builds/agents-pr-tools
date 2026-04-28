@@ -9,7 +9,14 @@ const AREA_RULES = [
 
 const KNOWN_AREAS = [...new Set([...AREA_RULES.map((rule) => rule.area), 'other'])];
 const VALID_STATES = new Set(['merged', 'open', 'closed', 'all']);
-const VALID_FORMATS = new Set(['markdown', 'table', 'json', 'csv', 'release-notes']);
+const VALID_FORMATS = new Set([
+  'markdown',
+  'table',
+  'json',
+  'csv',
+  'release-notes',
+  'maintainer-brief'
+]);
 const VALID_SORTS = new Set(['created', 'updated']);
 const VALID_ORDERS = new Set(['desc', 'asc']);
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
@@ -289,7 +296,9 @@ export function normalizeFormat(value) {
   const format = String(value || 'markdown').trim().toLowerCase();
 
   if (!VALID_FORMATS.has(format)) {
-    throw new Error(`Invalid format "${value}". Use markdown, table, json, csv, or release-notes.`);
+    throw new Error(
+      `Invalid format "${value}". Use markdown, table, json, csv, release-notes, or maintainer-brief.`
+    );
   }
 
   return format;
@@ -841,6 +850,120 @@ export function toReleaseNotes({
 
     lines.push('');
   }
+
+  return `${lines.join('\n')}\n`;
+}
+
+function latestDateForPullRequest(pr) {
+  return pr.mergedAt || pr.closedAt || pr.updatedAt || pr.createdAt || '';
+}
+
+function formatPullRequestLine(pr) {
+  const date = latestDateForPullRequest(pr).slice(0, 10) || 'unknown date';
+  const labels = pr.labels?.length ? `; labels: ${formatList(pr.labels)}` : '';
+  return [
+    `- [#${pr.number}](${pr.url})`,
+    `[${pr.area}]`,
+    `[${pr.state}]`,
+    `${pr.title} (@${pr.author}, ${date}${labels})`
+  ].join(' ');
+}
+
+function appendTopPullRequests(lines, { title, pullRequests, limit = 5 }) {
+  lines.push(`## ${title}`);
+
+  if (pullRequests.length === 0) {
+    lines.push('- No matching pull requests.');
+    lines.push('');
+    return;
+  }
+
+  for (const pr of pullRequests.slice(0, limit)) {
+    lines.push(formatPullRequestLine(pr));
+  }
+
+  lines.push('');
+}
+
+export function toMaintainerBrief({
+  repo,
+  authors,
+  state,
+  pullRequests,
+  since,
+  until,
+  sort,
+  order,
+  areas = [],
+  labels = []
+}) {
+  const mergedPullRequests = pullRequests.filter((pr) => pr.state === 'merged');
+  const openPullRequests = pullRequests.filter((pr) => pr.state === 'open');
+  const areaSummary = summarizePullRequests(pullRequests);
+  const labelSummary = summarizeLabels(pullRequests);
+  const lines = [
+    `# Maintainer Brief for ${repo}`,
+    '',
+    `- ${authors.length > 1 ? 'Authors' : 'Author'}: ${formatList(authors)}`,
+    `- State filter: ${state}`,
+    `- Total PRs analyzed: ${pullRequests.length}`,
+    `- Sort: ${sort} ${order}`
+  ];
+
+  if (areas.length > 0) {
+    lines.push(`- Area filter: ${formatList(areas)}`);
+  }
+
+  if (labels.length > 0) {
+    lines.push(`- Label filter: ${formatList(labels)}`);
+  }
+
+  if (since || until) {
+    lines.push(
+      `- Date window (${getDateLabelForState(state)}): ${since || '...'} -> ${until || '...'}`
+    );
+  }
+
+  lines.push('');
+  lines.push('## Maintenance Snapshot');
+  lines.push(`- Merged maintenance work: ${mergedPullRequests.length}`);
+  lines.push(`- Open review queue: ${openPullRequests.length}`);
+  lines.push(`- Covered work areas: ${areaSummary.map((item) => item.area).join(', ') || 'none'}`);
+
+  if (labelSummary.length > 0) {
+    const topLabels = labelSummary
+      .slice(0, 6)
+      .map((item) => `${item.label} (${item.count})`)
+      .join(', ');
+    lines.push(`- Top labels: ${topLabels}`);
+  }
+
+  lines.push('');
+  lines.push('## Work Area Coverage');
+
+  if (areaSummary.length === 0) {
+    lines.push('- No matching pull requests.');
+  } else {
+    for (const item of areaSummary) {
+      lines.push(`- ${item.area}: ${item.count}`);
+    }
+  }
+
+  lines.push('');
+  appendTopPullRequests(lines, {
+    title: 'Open Review Queue',
+    pullRequests: openPullRequests,
+    limit: 10
+  });
+  appendTopPullRequests(lines, {
+    title: 'Release-Note Candidates',
+    pullRequests: mergedPullRequests,
+    limit: 10
+  });
+  lines.push('## Maintainer Handoff');
+  lines.push('- Use the open queue to decide what needs review, validation, or follow-up.');
+  lines.push('- Use release-note candidates to prepare changelog entries grouped by SDK area.');
+  lines.push('- Use work-area coverage to spot runtime, docs, tests, and workflow concentration.');
 
   return `${lines.join('\n')}\n`;
 }

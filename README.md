@@ -1,8 +1,8 @@
 # agents-pr-tools
 
-Small, dependency-free GitHub pull request reporting utilities for contributors, maintainers, and release note workflows.
+Maintainer-grade, dependency-free GitHub pull request reporting for upstream SDK work.
 
-`agents-pr-tools` turns public GitHub PR history into Markdown summaries, tables, JSON, CSV, or release-note style output. It is designed for cases where you need a fast, verifiable summary of upstream work: profile README updates, maintainer applications, weekly reports, changelog drafts, or lightweight OSS contribution audits.
+`agents-pr-tools` turns public GitHub PR history into Markdown summaries, tables, JSON, CSV, release-note style output, or maintainer handoff briefs. It is designed for cases where you need a fast, verifiable summary of upstream work: review triage, profile README updates, maintainer applications, weekly reports, changelog drafts, or lightweight OSS contribution audits.
 
 ## Highlights
 
@@ -11,6 +11,7 @@ Small, dependency-free GitHub pull request reporting utilities for contributors,
 - Distinguish merged PRs from closed-but-unmerged PRs.
 - Filter by state, date window, inferred work area, and GitHub labels.
 - Render Markdown, plain-text tables, JSON, CSV, or release-notes Markdown.
+- Generate maintainer briefs with a maintenance snapshot, open review queue, release-note candidates, and handoff notes.
 - Write reports directly to disk with `--output`.
 - Generate compact summary-only reports for Markdown, table, and JSON output.
 - Use `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token` automatically when available.
@@ -58,6 +59,21 @@ node src/cli.mjs \
 ```
 
 ## Examples
+
+### Maintainer brief
+
+```bash
+node src/cli.mjs \
+  --repo openai/openai-agents-js \
+  --author wsk-builds \
+  --state all \
+  --since 2026-04-01 \
+  --until 2026-04-30 \
+  --format maintainer-brief \
+  --output reports/openai-agents-js-maintainer-brief.md
+```
+
+`maintainer-brief` is optimized for review handoffs. It includes work-area coverage, open review queue, release-note candidates, and concrete maintainer next steps. See [examples/openai-agents-maintainer-brief.md](./examples/openai-agents-maintainer-brief.md) for a representative output.
 
 ### Recent merged work
 
@@ -137,7 +153,7 @@ Options:
   --author <login[,login...]>            One or more GitHub author logins. Use @me for the authenticated viewer.
   --state <merged|open|closed|all>       Pull request state filter. Default: merged.
   --limit <n>                            Maximum number of PRs to fetch. Default: 20.
-  --format <markdown|table|json|csv|release-notes>
+  --format <markdown|table|json|csv|release-notes|maintainer-brief>
                                          Output format. Default: markdown.
   --sort <created|updated>               Search sort field. Default: created.
   --order <desc|asc>                     Search order. Default: desc.
@@ -169,7 +185,7 @@ Known inferred areas:
 - `merged` date filters use the merged timestamp.
 - `closed` date filters use the closed timestamp.
 - `open` and `all` date filters use the created timestamp.
-- `csv` and `release-notes` always render full output and do not support `--summary-only`.
+- `csv`, `release-notes`, and `maintainer-brief` always render full output and do not support `--summary-only`.
 - `--summary-only` is supported only with `markdown`, `table`, and `json`.
 - `--output` creates parent directories automatically.
 
@@ -218,6 +234,14 @@ Summary output includes:
 - totals by author
 - totals by label
 - optional date, area, and label filters
+
+Maintainer brief output adds:
+
+- maintenance snapshot
+- work-area coverage
+- open review queue
+- release-note candidates
+- maintainer handoff notes
 
 ## Development
 

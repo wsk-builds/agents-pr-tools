@@ -234,7 +234,7 @@ test('main writes rendered output to --output targets', async () => {
   assert.match(readFileSync(outputPath, 'utf8'), /# Pull Request Summary for alice/);
 });
 
-test('main rejects summary-only with csv output', async () => {
+test('main rejects summary-only with non-summary formats', async () => {
   await assert.rejects(
     () =>
       main([
@@ -244,6 +244,20 @@ test('main rejects summary-only with csv output', async () => {
         'alice',
         '--format',
         'csv',
+        '--summary-only'
+      ]),
+    /--summary-only is only supported/
+  );
+
+  await assert.rejects(
+    () =>
+      main([
+        '--repo',
+        'acme/demo',
+        '--author',
+        'alice',
+        '--format',
+        'maintainer-brief',
         '--summary-only'
       ]),
     /--summary-only is only supported/

@@ -27,6 +27,7 @@ import {
   summarizePullRequests,
   summarizeStates,
   toCsv,
+  toMaintainerBrief,
   toMarkdown,
   toReleaseNotes,
   toTable
@@ -287,6 +288,41 @@ test('renderers cover markdown, table, csv, release-notes, and summary payloads'
   assert.match(releaseNotes, /# Release Notes for openai\/openai-agents-js/);
   assert.match(releaseNotes, /## agents-extensions/);
   assert.match(releaseNotes, /@bob/);
+
+  const maintainerBrief = toMaintainerBrief({
+    repo: 'openai/openai-agents-js',
+    authors: ['alice', 'bob'],
+    state: 'all',
+    pullRequests: [
+      ...pullRequests,
+      {
+        number: 1178,
+        title: 'fix(agents-core): preserve streaming usage after abort',
+        url: 'https://github.com/openai/openai-agents-js/pull/1178',
+        author: 'alice',
+        area: 'agents-core',
+        labels: ['runtime'],
+        state: 'open',
+        createdAt: '2026-04-17T12:00:00.000Z',
+        updatedAt: '2026-04-20T13:00:00.000Z',
+        closedAt: null,
+        mergedAt: null
+      }
+    ],
+    sort: 'created',
+    order: 'desc',
+    labels: ['bug', 'docs']
+  });
+
+  assert.match(maintainerBrief, /# Maintainer Brief for openai\/openai-agents-js/);
+  assert.match(maintainerBrief, /## Maintenance Snapshot/);
+  assert.match(maintainerBrief, /Merged maintenance work: 1/);
+  assert.match(maintainerBrief, /Open review queue: 1/);
+  assert.match(maintainerBrief, /## Open Review Queue/);
+  assert.match(maintainerBrief, /#1178/);
+  assert.match(maintainerBrief, /## Release-Note Candidates/);
+  assert.match(maintainerBrief, /#1171/);
+  assert.match(maintainerBrief, /## Maintainer Handoff/);
 
   assert.deepEqual(buildSummaryPayload({
     repo: 'openai/openai-agents-js',
