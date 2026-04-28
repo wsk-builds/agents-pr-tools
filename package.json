@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "type": "module",
-  "description": "Small GitHub PR reporting utilities for upstream contributors and maintainers.",
+  "description": "Maintainer-grade GitHub PR reporting for upstream SDK work.",
   "keywords": [
     "github",
     "pull-requests",
@@ -21,6 +21,7 @@
   "homepage": "https://github.com/wsk-builds/agents-pr-tools#readme",
   "files": [
     "src",
+    "examples",
     "README.md",
     "LICENSE"
   ],
@@ -29,6 +30,7 @@
   },
   "scripts": {
     "start": "node src/cli.mjs",
+    "brief:openai": "node src/cli.mjs --repo openai/openai-agents-js --author wsk-builds --state all --format maintainer-brief",
     "check": "node --check src/cli.mjs && node --check src/lib.mjs",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage"

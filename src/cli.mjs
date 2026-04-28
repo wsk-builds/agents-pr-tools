@@ -19,6 +19,7 @@ import {
   parseRepo,
   resolveAuthorLogins,
   toCsv,
+  toMaintainerBrief,
   toMarkdown,
   toReleaseNotes,
   toTable
@@ -34,7 +35,7 @@ export function usage() {
     '  --author <login[,login...]>            One or more GitHub author logins. Use @me for the authenticated viewer.',
     '  --state <merged|open|closed|all>       Pull request state filter. Default: merged.',
     '  --limit <n>                            Maximum number of PRs to fetch. Default: 20.',
-    '  --format <markdown|table|json|csv|release-notes>',
+    '  --format <markdown|table|json|csv|release-notes|maintainer-brief>',
     '                                         Output format. Default: markdown.',
     '  --sort <created|updated>               Search sort field. Default: created.',
     '  --order <desc|asc>                     Search order. Default: desc.',
@@ -50,7 +51,7 @@ export function usage() {
     '  - merged reports filter by merged date when --since/--until is used.',
     '  - closed reports mean closed but not merged.',
     '  - open and all reports filter by created date.',
-    '  - csv and release-notes always render full output.',
+    '  - csv, release-notes, and maintainer-brief always render full output.',
     '  - @me requires GitHub authentication.'
   ].join('\n');
 }
@@ -205,6 +206,8 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
     renderedOutput = toCsv(payload);
   } else if (format === 'release-notes') {
     renderedOutput = toReleaseNotes(payload);
+  } else if (format === 'maintainer-brief') {
+    renderedOutput = toMaintainerBrief(payload);
   } else {
     renderedOutput = toMarkdown(payload);
   }
