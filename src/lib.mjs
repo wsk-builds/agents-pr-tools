@@ -898,6 +898,7 @@ export function toMaintainerBrief({
   labels = []
 }) {
   const mergedPullRequests = pullRequests.filter((pr) => pr.state === 'merged');
+  const mergedMaintenancePullRequests = mergedPullRequests.filter((pr) => pr.area === 'maintenance');
   const openPullRequests = pullRequests.filter((pr) => pr.state === 'open');
   const areaSummary = summarizePullRequests(pullRequests);
   const labelSummary = summarizeLabels(pullRequests);
@@ -926,7 +927,8 @@ export function toMaintainerBrief({
 
   lines.push('');
   lines.push('## Maintenance Snapshot');
-  lines.push(`- Merged maintenance work: ${mergedPullRequests.length}`);
+  lines.push(`- Merged pull requests: ${mergedPullRequests.length}`);
+  lines.push(`- Merged maintenance work: ${mergedMaintenancePullRequests.length}`);
   lines.push(`- Open review queue: ${openPullRequests.length}`);
   lines.push(`- Covered work areas: ${areaSummary.map((item) => item.area).join(', ') || 'none'}`);
 

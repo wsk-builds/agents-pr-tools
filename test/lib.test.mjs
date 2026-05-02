@@ -316,7 +316,8 @@ test('renderers cover markdown, table, csv, release-notes, and summary payloads'
 
   assert.match(maintainerBrief, /# Maintainer Brief for openai\/openai-agents-js/);
   assert.match(maintainerBrief, /## Maintenance Snapshot/);
-  assert.match(maintainerBrief, /Merged maintenance work: 1/);
+  assert.match(maintainerBrief, /Merged pull requests: 1/);
+  assert.match(maintainerBrief, /Merged maintenance work: 0/);
   assert.match(maintainerBrief, /Open review queue: 1/);
   assert.match(maintainerBrief, /## Open Review Queue/);
   assert.match(maintainerBrief, /#1178/);
