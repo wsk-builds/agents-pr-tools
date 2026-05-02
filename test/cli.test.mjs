@@ -276,6 +276,7 @@ test('main rejects @me when authentication is unavailable', async () => {
           '--summary-only'
         ],
         {
+          token: undefined,
           fetchImpl: async () => {
             throw new Error('fetch should not be called without authentication');
           }

@@ -32,8 +32,8 @@
     "start": "node src/cli.mjs",
     "brief:openai": "node src/cli.mjs --repo openai/openai-agents-js --author wsk-builds --state all --format maintainer-brief",
     "check": "node --check src/cli.mjs && node --check src/lib.mjs",
-    "test": "node --test",
-    "test:coverage": "node --test --experimental-test-coverage"
+    "test": "node --test --experimental-test-isolation=none",
+    "test:coverage": "node --test --experimental-test-isolation=none --experimental-test-coverage"
   },
   "engines": {
     "node": ">=22"

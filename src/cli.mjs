@@ -160,7 +160,9 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
   const execFileSyncImpl = dependencies.execFileSync || execFileSync;
   const fetchImpl = dependencies.fetchImpl || fetch;
   const stdout = dependencies.stdout || process.stdout;
-  const token = await getAccessToken({ execFileSync: execFileSyncImpl });
+  const token = Object.prototype.hasOwnProperty.call(dependencies, 'token')
+    ? dependencies.token
+    : await getAccessToken({ execFileSync: execFileSyncImpl });
   const authors = await resolveAuthorLogins({
     authors: options.author,
     fetchImpl,
