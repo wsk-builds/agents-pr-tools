@@ -33,7 +33,8 @@
     "brief:openai": "node src/cli.mjs --repo openai/openai-agents-js --author wsk-builds --state all --format maintainer-brief",
     "check": "node --check src/cli.mjs && node --check src/lib.mjs",
     "test": "node --test --experimental-test-isolation=none",
-    "test:coverage": "node --test --experimental-test-isolation=none --experimental-test-coverage"
+    "test:coverage": "node --test --experimental-test-isolation=none --experimental-test-coverage",
+    "pack:check": "npm pack --dry-run"
   },
   "engines": {
     "node": ">=22"

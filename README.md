@@ -263,6 +263,12 @@ Run tests with Node's built-in coverage report:
 npm run test:coverage
 ```
 
+Verify the published package contents:
+
+```bash
+npm run pack:check
+```
+
 Smoke-test the CLI help output:
 
 ```bash
@@ -271,7 +277,7 @@ node src/cli.mjs --help
 
 ## CI
 
-The GitHub Actions workflow runs on Node.js 22 and 24. It validates syntax, runs the test suite, runs the built-in Node coverage report, and smoke-tests the CLI help command.
+The GitHub Actions workflow runs on Node.js 22 and 24. It validates syntax, runs the test suite, runs the built-in Node coverage report, verifies the npm package contents with `npm pack --dry-run`, and smoke-tests the CLI help command.
 
 ## Design Notes
 
