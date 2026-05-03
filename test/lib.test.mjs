@@ -113,7 +113,8 @@ test('inferArea, canonicalizeState, and summaries stay meaningful across multipl
 
   assert.equal(inferArea(pullRequests[0].title, pullRequests[0].labels), 'agents-realtime');
   assert.equal(inferArea('fix: preserve streaming usage after AbortSignal cancellation', ['package:agents-core']), 'agents-core');
-  assert.equal(inferArea('docs: walkthrough', ['package:agents-extensions', 'documentation']), 'agents-extensions');
+  assert.equal(inferArea('docs: walkthrough', ['package:agents-extensions', 'documentation']), 'docs');
+  assert.equal(inferArea('test(agents-extensions): add coverage', ['package:agents-extensions']), 'tests');
   assert.equal(canonicalizeState({ state: 'closed', mergedAt: '2026-04-01T00:00:00.000Z' }), 'merged');
   assert.equal(canonicalizeState({ state: 'closed', mergedAt: null }), 'closed');
   assert.deepEqual(summarizePullRequests(pullRequests), [

@@ -11,15 +11,16 @@
 - Merged pull requests: 9
 - Merged maintenance work: 1
 - Open review queue: 1
-- Covered work areas: docs, agents-core, agents-realtime, agents-extensions, maintenance, other
+- Covered work areas: docs, agents-core, agents-realtime, tests, agents-extensions, maintenance, other
 - Top labels: documentation (4), package:agents-core (4), package:agents-openai (3), package:agents-realtime (3), package:agents-extensions (2), project (1)
 
 ## Work Area Coverage
 
-- docs: 6
-- agents-core: 3
-- agents-realtime: 3
-- agents-extensions: 2
+- docs: 7
+- agents-core: 2
+- agents-realtime: 2
+- tests: 2
+- agents-extensions: 1
 - maintenance: 1
 - other: 1
 
@@ -32,10 +33,10 @@
 - [#1172](https://github.com/openai/openai-agents-js/pull/1172) [agents-core] [merged] fix(agents-core): restore discriminated union tool schemas (@wsk-builds, 2026-04-17; labels: package:agents-core)
 - [#1171](https://github.com/openai/openai-agents-js/pull/1171) [agents-extensions] [merged] fix(agents-extensions): #1163 preserve nested audio config (@wsk-builds, 2026-04-15; labels: package:agents-extensions)
 - [#1170](https://github.com/openai/openai-agents-js/pull/1170) [agents-realtime] [merged] fix(agents-realtime): fail fast on unsupported SIP VAD fields (@wsk-builds, 2026-04-15; labels: documentation, package:agents-realtime)
-- [#1169](https://github.com/openai/openai-agents-js/pull/1169) [agents-core] [merged] test: stabilize leak detection harness (@wsk-builds, 2026-04-17; labels: package:agents-core)
+- [#1169](https://github.com/openai/openai-agents-js/pull/1169) [tests] [merged] test: stabilize leak detection harness (@wsk-builds, 2026-04-17; labels: package:agents-core)
 - [#1166](https://github.com/openai/openai-agents-js/pull/1166) [maintenance] [merged] fix(husky): disable trufflehog auto-update in pre-commit (@wsk-builds, 2026-04-15)
 - [#1165](https://github.com/openai/openai-agents-js/pull/1165) [docs] [merged] docs(nextjs): fix README source path (@wsk-builds, 2026-04-15)
-- [#1162](https://github.com/openai/openai-agents-js/pull/1162) [agents-extensions] [merged] test(agents-extensions): add AI SDK UI boundary coverage (@wsk-builds, 2026-04-15; labels: package:agents-extensions)
+- [#1162](https://github.com/openai/openai-agents-js/pull/1162) [tests] [merged] test(agents-extensions): add AI SDK UI boundary coverage (@wsk-builds, 2026-04-15; labels: package:agents-extensions)
 - [#1160](https://github.com/openai/openai-agents-js/pull/1160) [docs] [merged] docs(agents-extensions): sync AI SDK docs and examples (@wsk-builds, 2026-04-13; labels: documentation, project)
 - [#1158](https://github.com/openai/openai-agents-js/pull/1158) [docs] [merged] docs: correct tools example commands (@wsk-builds, 2026-04-14)
 

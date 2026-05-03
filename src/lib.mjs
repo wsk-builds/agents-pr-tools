@@ -105,6 +105,20 @@ function hasExactOrScopedLabel(labels, candidates) {
   );
 }
 
+function inferAreaFromTitlePriority(title) {
+  const normalizedTitle = String(title || '').trim();
+
+  if (/^docs\b/i.test(normalizedTitle)) {
+    return 'docs';
+  }
+
+  if (/^test\b/i.test(normalizedTitle)) {
+    return 'tests';
+  }
+
+  return undefined;
+}
+
 export function getKnownAreas() {
   return [...KNOWN_AREAS];
 }
@@ -190,6 +204,11 @@ export function parseLabelFilter(value) {
 export function inferArea(title, labels = []) {
   const normalizedLabels = normalizeLabelList(labels);
   const normalizedTitle = String(title || '').trim();
+  const titlePriorityArea = inferAreaFromTitlePriority(normalizedTitle);
+
+  if (titlePriorityArea) {
+    return titlePriorityArea;
+  }
 
   if (hasExactOrScopedLabel(normalizedLabels, ['agents-extensions'])) {
     return 'agents-extensions';
