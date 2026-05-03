@@ -189,6 +189,7 @@ export function parseLabelFilter(value) {
 
 export function inferArea(title, labels = []) {
   const normalizedLabels = normalizeLabelList(labels);
+  const normalizedTitle = String(title || '').trim();
 
   if (hasExactOrScopedLabel(normalizedLabels, ['agents-extensions'])) {
     return 'agents-extensions';
@@ -227,7 +228,7 @@ export function inferArea(title, labels = []) {
   }
 
   for (const rule of AREA_RULES) {
-    if (rule.patterns.some((pattern) => pattern.test(title))) {
+    if (rule.patterns.some((pattern) => pattern.test(normalizedTitle))) {
       return rule.area;
     }
   }
@@ -1142,14 +1143,15 @@ async function fetchPullRequestDetail({ repo, number, fetchImpl, requestState })
 }
 
 function normalizePullRequest(detail, { labels = [] } = {}) {
+  const normalizedTitle = String(detail.title || '').trim();
   const normalizedLabels = normalizeLabelList(detail.labels?.length ? detail.labels : labels);
 
   return {
     number: detail.number,
-    title: detail.title,
+    title: normalizedTitle,
     url: detail.html_url,
     author: detail.user?.login || 'unknown',
-    area: inferArea(detail.title, normalizedLabels),
+    area: inferArea(normalizedTitle, normalizedLabels),
     labels: normalizedLabels,
     state: canonicalizeState({
       state: detail.state,

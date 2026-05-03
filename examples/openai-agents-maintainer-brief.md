@@ -36,7 +36,7 @@
 - [#1166](https://github.com/openai/openai-agents-js/pull/1166) [maintenance] [merged] fix(husky): disable trufflehog auto-update in pre-commit (@wsk-builds, 2026-04-15)
 - [#1165](https://github.com/openai/openai-agents-js/pull/1165) [docs] [merged] docs(nextjs): fix README source path (@wsk-builds, 2026-04-15)
 - [#1162](https://github.com/openai/openai-agents-js/pull/1162) [agents-extensions] [merged] test(agents-extensions): add AI SDK UI boundary coverage (@wsk-builds, 2026-04-15; labels: package:agents-extensions)
-- [#1160](https://github.com/openai/openai-agents-js/pull/1160) [docs] [merged]  docs(agents-extensions): sync AI SDK docs and examples (@wsk-builds, 2026-04-13; labels: documentation, project)
+- [#1160](https://github.com/openai/openai-agents-js/pull/1160) [docs] [merged] docs(agents-extensions): sync AI SDK docs and examples (@wsk-builds, 2026-04-13; labels: documentation, project)
 - [#1158](https://github.com/openai/openai-agents-js/pull/1158) [docs] [merged] docs: correct tools example commands (@wsk-builds, 2026-04-14)
 
 ## Maintainer Handoff

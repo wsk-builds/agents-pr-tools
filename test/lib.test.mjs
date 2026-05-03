@@ -372,6 +372,39 @@ test('renderers cover markdown, table, csv, release-notes, and summary payloads'
   });
 });
 
+test('fetchPullRequests trims pull request titles before rendering and area inference', async () => {
+  const fetchImpl = async (url) => {
+    const requestUrl = new URL(url);
+
+    if (requestUrl.pathname === '/search/issues') {
+      return jsonResponse({ items: [{ number: 42, labels: [] }] });
+    }
+
+    return jsonResponse({
+      number: 42,
+      title: '  docs: tighten README examples  ',
+      html_url: 'https://github.com/acme/demo/pull/42',
+      user: { login: 'alice' },
+      state: 'closed',
+      created_at: '2026-04-10T00:00:00.000Z',
+      updated_at: '2026-04-11T00:00:00.000Z',
+      closed_at: '2026-04-12T00:00:00.000Z',
+      merged_at: '2026-04-12T00:00:00.000Z'
+    });
+  };
+
+  const [pullRequest] = await fetchPullRequests({
+    repo: 'acme/demo',
+    author: 'alice',
+    state: 'merged',
+    limit: 1,
+    fetchImpl
+  });
+
+  assert.equal(pullRequest.title, 'docs: tighten README examples');
+  assert.equal(pullRequest.area, 'docs');
+});
+
 test('fetchPullRequests paginates and filters merged PRs out of the closed view', async () => {
   const calls = [];
   const fetchImpl = async (url) => {
