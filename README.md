@@ -189,7 +189,7 @@ Known inferred areas:
 - `--summary-only` is supported only with `markdown`, `table`, and `json`.
 - `--output` creates parent directories automatically.
 
-Area detection is heuristic. The tool looks at normalized labels first, then PR title prefixes and keywords. Unknown work is grouped as `other`.
+Area detection is heuristic. The tool looks at normalized labels first, including package-scoped labels such as `package:agents-core`, then PR title prefixes and keywords. Unknown work is grouped as `other`.
 
 ## Authentication and Reliability
 

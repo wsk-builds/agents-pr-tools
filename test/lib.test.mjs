@@ -96,7 +96,7 @@ test('inferArea, canonicalizeState, and summaries stay meaningful across multipl
       number: 1,
       title: 'fix: fail fast on unsupported SIP VAD fields',
       author: 'alice',
-      labels: ['Realtime', 'Voice'],
+      labels: ['Documentation', 'package:agents-realtime'],
       state: 'merged',
       mergedAt: '2026-04-01T00:00:00.000Z'
     },
@@ -112,6 +112,8 @@ test('inferArea, canonicalizeState, and summaries stay meaningful across multipl
   ];
 
   assert.equal(inferArea(pullRequests[0].title, pullRequests[0].labels), 'agents-realtime');
+  assert.equal(inferArea('fix: preserve streaming usage after AbortSignal cancellation', ['package:agents-core']), 'agents-core');
+  assert.equal(inferArea('docs: walkthrough', ['package:agents-extensions', 'documentation']), 'agents-extensions');
   assert.equal(canonicalizeState({ state: 'closed', mergedAt: '2026-04-01T00:00:00.000Z' }), 'merged');
   assert.equal(canonicalizeState({ state: 'closed', mergedAt: null }), 'closed');
   assert.deepEqual(summarizePullRequests(pullRequests), [
@@ -128,8 +130,8 @@ test('inferArea, canonicalizeState, and summaries stay meaningful across multipl
   ]);
   assert.deepEqual(summarizeLabels(pullRequests), [
     { label: 'docs', count: 1 },
-    { label: 'realtime', count: 1 },
-    { label: 'voice', count: 1 }
+    { label: 'documentation', count: 1 },
+    { label: 'package:agents-realtime', count: 1 }
   ]);
 });
 

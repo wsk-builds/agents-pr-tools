@@ -99,6 +99,12 @@ function normalizeLabelList(labels) {
   ];
 }
 
+function hasExactOrScopedLabel(labels, candidates) {
+  return labels.some((label) =>
+    candidates.some((candidate) => label === candidate || label === `package:${candidate}`)
+  );
+}
+
 export function getKnownAreas() {
   return [...KNOWN_AREAS];
 }
@@ -184,22 +190,20 @@ export function parseLabelFilter(value) {
 export function inferArea(title, labels = []) {
   const normalizedLabels = normalizeLabelList(labels);
 
-  if (
-    normalizedLabels.some((label) => ['agents-extensions', 'extensions', 'ai-sdk'].includes(label))
-  ) {
+  if (hasExactOrScopedLabel(normalizedLabels, ['agents-extensions'])) {
     return 'agents-extensions';
   }
 
   if (
-    normalizedLabels.some((label) =>
-      ['agents-realtime', 'realtime', 'vad', 'sip', 'voice'].includes(label)
-    )
+    hasExactOrScopedLabel(normalizedLabels, ['agents-realtime']) ||
+    normalizedLabels.some((label) => ['realtime', 'vad', 'sip', 'voice'].includes(label))
   ) {
     return 'agents-realtime';
   }
 
   if (
-    normalizedLabels.some((label) => ['agents-core', 'core', 'mcp', 'runstate'].includes(label))
+    hasExactOrScopedLabel(normalizedLabels, ['agents-core']) ||
+    normalizedLabels.some((label) => ['core', 'mcp', 'runstate'].includes(label))
   ) {
     return 'agents-core';
   }
