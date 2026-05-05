@@ -1,6 +1,7 @@
 const AREA_RULES = [
   { area: 'agents-extensions', patterns: [/agents-extensions/i, /ai sdk/i] },
   { area: 'agents-realtime', patterns: [/agents-realtime/i, /\brealtime\b/i, /\bvad\b/i, /\bsip\b/i] },
+  { area: 'agents-openai', patterns: [/agents-openai/i, /\bresponses?\b/i, /\bchat completions?\b/i] },
   { area: 'agents-core', patterns: [/agents-core/i, /\bmcp\b/i, /\brunstate\b/i] },
   { area: 'docs', patterns: [/^docs\b/i, /readme/i, /example/i] },
   { area: 'tests', patterns: [/^test\b/i, /\bcoverage\b/i, /\bflaky\b/i] },
@@ -226,6 +227,10 @@ export function inferArea(title, labels = []) {
     normalizedLabels.some((label) => ['core', 'mcp', 'runstate'].includes(label))
   ) {
     return 'agents-core';
+  }
+
+  if (hasExactOrScopedLabel(normalizedLabels, ['agents-openai'])) {
+    return 'agents-openai';
   }
 
   if (

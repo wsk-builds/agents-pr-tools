@@ -112,6 +112,7 @@ test('inferArea, canonicalizeState, and summaries stay meaningful across multipl
   ];
 
   assert.equal(inferArea(pullRequests[0].title, pullRequests[0].labels), 'agents-realtime');
+  assert.equal(inferArea('fix: normalize compacted multimodal session items', ['package:agents-openai']), 'agents-openai');
   assert.equal(inferArea('fix: preserve streaming usage after AbortSignal cancellation', ['package:agents-core']), 'agents-core');
   assert.equal(inferArea('docs: walkthrough', ['package:agents-extensions', 'documentation']), 'docs');
   assert.equal(inferArea('test(agents-extensions): add coverage', ['package:agents-extensions']), 'tests');

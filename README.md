@@ -170,6 +170,7 @@ Known inferred areas:
 
 - `agents-extensions`
 - `agents-realtime`
+- `agents-openai`
 - `agents-core`
 - `docs`
 - `tests`

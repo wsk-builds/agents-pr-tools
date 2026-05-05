@@ -11,7 +11,7 @@
 - Merged pull requests: 9
 - Merged maintenance work: 1
 - Open review queue: 1
-- Covered work areas: docs, agents-core, agents-realtime, tests, agents-extensions, maintenance, other
+- Covered work areas: docs, agents-core, agents-realtime, tests, agents-extensions, maintenance, agents-openai
 - Top labels: documentation (4), package:agents-core (4), package:agents-openai (3), package:agents-realtime (3), package:agents-extensions (2), project (1)
 
 ## Work Area Coverage
@@ -22,7 +22,7 @@
 - tests: 2
 - agents-extensions: 1
 - maintenance: 1
-- other: 1
+- agents-openai: 1
 
 ## Open Review Queue
 
