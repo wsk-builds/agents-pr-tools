@@ -11,7 +11,7 @@
 - Merged pull requests: 9
 - Merged maintenance work: 1
 - Open review queue: 1
-- Covered work areas: docs, agents-core, agents-realtime, tests, agents-extensions, maintenance, agents-openai
+- Covered work areas: docs, agents-core, agents-realtime, tests, agents-extensions, agents-openai, maintenance
 - Top labels: documentation (4), package:agents-core (4), package:agents-openai (3), package:agents-realtime (3), package:agents-extensions (2), project (1)
 
 ## Work Area Coverage
@@ -21,8 +21,8 @@
 - agents-realtime: 2
 - tests: 2
 - agents-extensions: 1
-- maintenance: 1
 - agents-openai: 1
+- maintenance: 1
 
 ## Open Review Queue
 
@@ -38,7 +38,7 @@
 - [#1165](https://github.com/openai/openai-agents-js/pull/1165) [docs] [merged] docs(nextjs): fix README source path (@wsk-builds, 2026-04-15)
 - [#1162](https://github.com/openai/openai-agents-js/pull/1162) [tests] [merged] test(agents-extensions): add AI SDK UI boundary coverage (@wsk-builds, 2026-04-15; labels: package:agents-extensions)
 - [#1160](https://github.com/openai/openai-agents-js/pull/1160) [docs] [merged] docs(agents-extensions): sync AI SDK docs and examples (@wsk-builds, 2026-04-13; labels: documentation, project)
-- [#1158](https://github.com/openai/openai-agents-js/pull/1158) [docs] [merged] docs: correct tools example commands (@wsk-builds, 2026-04-14)
+- [#1158](https://github.com/openai/openai-agents-js/pull/1158) [docs] [merged] docs: fix tools example commands (@wsk-builds, 2026-04-12)
 
 ## Maintainer Handoff
 
